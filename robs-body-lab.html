@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Body Lab">
+  <meta name="theme-color" content="#080808">
+  <title>Rob's Body Lab</title>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    body{margin:0;background:#080808;-webkit-text-size-adjust:100%;overflow-x:hidden}
+    input,textarea,button{font-family:inherit}
+    input[type=number]{-moz-appearance:textfield}
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+    input[type=range]{-webkit-appearance:none;appearance:none;background:transparent}
+    input[type=range]::-webkit-slider-runnable-track{height:4px;background:#1e1e1e;border-radius:2px}
+    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;background:#ff6b2b;border-radius:50%;margin-top:-11px;cursor:pointer}
+    ::placeholder{color:#2a2a2a}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef} = React;
+
+// ── constants ──────────────────────────────────────────────────────────────────
+const SUB_T = ['10x3','5x6','3x10'];
+const WO_TYPES = [
+  {id:'10x3',label:'10×3:00',sub:'Intervals'},{id:'5x6',label:'5×6:00',sub:'Intervals'},
+  {id:'3x10',label:'3×10:00',sub:'Intervals'},{id:'LONG',label:'Long',sub:'Run'},
+  {id:'EASY',label:'Easy',sub:'Run'},{id:'OFF',label:'Off',sub:'Rest'},
+  {id:'RACE',label:'Race',sub:''},{id:'OTHER',label:'Other',sub:''},
+];
+const P1_EMPTY = {sleepScore:'',sleepHours:'',rhr:'',hrv:'',cals:'',protein:'',carbs:'',weight:''};
+const P2_EMPTY = {wo:'',avgPace:'',avgHR:'',totalKM:'',totalTime:'',corosLoad:'',rpe:'',
+  preCarbs:'',caffeine:'',kBicarb:'',inCarbs:'',runningExtras:'',runningExtrasLoad:'',
+  ubSets:'',lbSets:'',mood:'',physicalIssues:'',jumpHeight:'',weather:'',trainingNotes:'',stress:''};
+
+// ── utilities ──────────────────────────────────────────────────────────────────
+const dk = (d) => { const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; };
+const yday = () => { const d=new Date(); d.setDate(d.getDate()-1); d.setHours(0,0,0,0); return d; };
+const tday = () => { const d=new Date(); d.setHours(0,0,0,0); return d; };
+const fmtDate = (d) => d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+const dowFull = (d) => d.toLocaleDateString('en-US',{weekday:'long'});
+const shortDate = (d) => `${d.getMonth()+1}/${d.getDate()}`;
+const ls = {
+  get:(k)=>{ try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch{return null} },
+  set:(k,v)=>{ try{localStorage.setItem(k,JSON.stringify(v))}catch{} },
+};
+const fileToB64 = (file) => new Promise((res,rej)=>{
+  const r=new FileReader();
+  r.onload=()=>{const[h,d]=r.result.split(',');res({data:d,mediaType:h.match(/data:([^;]+)/)[1]})};
+  r.onerror=()=>rej(new Error('File read failed'));
+  r.readAsDataURL(file);
+});
+const copyText = (text,onDone) => {
+  const fb=()=>{const ta=document.createElement('textarea');ta.value=text;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.focus();ta.select();document.execCommand('copy');document.body.removeChild(ta);onDone()};
+  navigator.clipboard?navigator.clipboard.writeText(text).then(onDone).catch(fb):fb();
+};
+const formatRow = (entry,date) => {
+  const e=entry||{};
+  return [dowFull(date),shortDate(date),e.wo,e.avgPace,e.avgHR,e.totalKM,e.totalTime,e.corosLoad,e.rpe,
+    e.preCarbs,e.inCarbs,e.caffeine,e.kBicarb,e.mood,e.weather,e.trainingNotes,
+    e.runningExtras,e.runningExtrasLoad,e.ubSets,e.lbSets,e.stress,e.physicalIssues,
+    e.sleepHours,e.sleepScore,e.rhr,e.hrv,e.cals,e.protein,e.carbs,e.weight,'',
+  ].map(v=>v==null?'':String(v)).join(',');
+};
+
+// ── scan prompts & labels ──────────────────────────────────────────────────────
+const OURA_PROMPT=`Two Oura app screenshots: Sleep summary screen and Readiness screen with Key Metrics.
+Extract: sleepScore (large sleep score number), sleepHours (total sleep as decimal hours: "7h 42min"=7.7), rhr (Resting Heart Rate bpm from Readiness Key Metrics), hrv (Heart Rate Variability ms from Readiness Key Metrics).
+Return ONLY valid JSON no markdown: {"sleepScore":93,"sleepHours":7.7,"rhr":44,"hrv":49}`;
+
+const COROS_SUBT_PROMPT=`Two Coros app screenshots: activity summary and lap breakdown table with individual interval rows and a Total row at bottom.
+Extract: totalKM (total distance km from summary), totalTime (total time H:MM:SS from summary), corosLoad (Training Load from summary), avgPace (Avg Pace from the TOTAL row of lap table as M:SS — NOT from summary), avgHR (Avg HR from the TOTAL row of lap table — NOT from summary).
+Return ONLY valid JSON no markdown: {"totalKM":10.77,"totalTime":"0:50:56","corosLoad":204,"avgPace":"4:13","avgHR":170}`;
+
+const COROS_EASY_PROMPT=`Coros app activity summary screenshot.
+Extract: totalKM (distance km), totalTime (time H:MM:SS), corosLoad (Training Load), avgPace (Average Pace M:SS), avgHR (Average Heart Rate number).
+Return ONLY valid JSON no markdown: {"totalKM":8.0,"totalTime":"0:47:00","corosLoad":52,"avgPace":"5:53","avgHR":132}`;
+
+const NUTRITION_PROMPT=`Nutrition tracking app screenshot showing daily food totals.
+Extract: cals (total calories number), protein (protein grams number), carbs (carbohydrates grams number).
+Return ONLY valid JSON no markdown: {"cals":3476,"protein":204,"carbs":549}`;
+
+const OURA_LABELS=[{key:'sleepScore',label:'Sleep Score'},{key:'sleepHours',label:'Sleep',unit:'h'},{key:'rhr',label:'RHR',unit:' bpm'},{key:'hrv',label:'HRV',unit:' ms'}];
+const COROS_LABELS=[{key:'avgPace',label:'Pace',unit:'/km'},{key:'avgHR',label:'HR',unit:' bpm'},{key:'totalKM',label:'Distance',unit:'km'},{key:'totalTime',label:'Time'},{key:'corosLoad',label:'Load'}];
+const NUTRITION_LABELS=[{key:'cals',label:'Calories'},{key:'protein',label:'Protein',unit:'g'},{key:'carbs',label:'Carbs',unit:'g'}];
+
+// ── primitives ─────────────────────────────────────────────────────────────────
+function F({label,hint,children}){
+  return(<div style={{marginBottom:22}}>
+    <div style={{fontSize:10,fontFamily:'Chakra Petch,monospace',letterSpacing:'0.13em',color:'#555',textTransform:'uppercase',marginBottom:8}}>{label}</div>
+    {children}
+    {hint&&<div style={{fontSize:11,color:'#333',marginTop:5}}>{hint}</div>}
+  </div>);
+}
+function Num({value,onChange,min=0,max=9999,step=1,placeholder=''}){
+  const adj=(d)=>{const next=Math.round(((parseFloat(value)||0)+d*step)*10000)/10000;onChange(String(Math.min(max,Math.max(min,next))))};
+  const btn={width:46,height:46,background:'#111',border:'1px solid #1e1e1e',borderRadius:8,color:'#777',fontSize:24,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,userSelect:'none',lineHeight:'1'};
+  return(<div style={{display:'flex',alignItems:'center',gap:8}}>
+    <button style={btn} onClick={()=>adj(-1)}>−</button>
+    <input type="number" inputMode="decimal" value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
+      style={{flex:1,height:46,background:'#0d0d0d',border:'1px solid #1e1e1e',borderRadius:8,color:'#f0f0f0',fontSize:18,textAlign:'center',fontFamily:'monospace',padding:'0 6px'}}/>
+    <button style={btn} onClick={()=>adj(+1)}>+</button>
+  </div>);
+}
+function Txt({value,onChange,placeholder,rows,inputMode}){
+  const base={width:'100%',background:'#0d0d0d',border:'1px solid #1e1e1e',borderRadius:8,color:'#f0f0f0',fontSize:15,fontFamily:'Barlow,sans-serif'};
+  return rows
+    ?<textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{...base,padding:'10px 12px',resize:'none'}}/>
+    :<input type="text" inputMode={inputMode||'text'} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={{...base,height:46,padding:'0 12px'}}/>;
+}
+function Pills({options,value,onChange,accent='#ff6b2b'}){
+  return(<div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+    {options.map(o=>{const active=String(value)===String(o);return(
+      <button key={o} onClick={()=>onChange(active?'':String(o))} style={{height:46,padding:'0 16px',borderRadius:8,cursor:'pointer',fontSize:14,
+        background:active?accent:'#0d0d0d',border:`1px solid ${active?accent:'#1e1e1e'}`,
+        color:active?'#fff':'#666',fontFamily:'Chakra Petch,monospace',letterSpacing:'0.04em',transition:'all 0.12s'}}>{o}</button>
+    )})}
+  </div>);
+}
+function Divider(){return <div style={{height:1,background:'#111',margin:'24px 0'}}/>;}
+
+// ── ScanButton ─────────────────────────────────────────────────────────────────
+function ScanButton({label,hint,multiple,prompt,previewLabels,onApply,apiKey}){
+  const [status,setStatus]=useState('idle');
+  const [extracted,setExtracted]=useState(null);
+  const [errMsg,setErrMsg]=useState('');
+  const inputRef=useRef();
+
+  const handleChange=async(e)=>{
+    const files=Array.from(e.target.files);
+    if(!files.length)return;
+    e.target.value='';
+    setStatus('loading');
+    try{
+      const imgs=await Promise.all(files.map(fileToB64));
+      const content=[
+        ...imgs.map(img=>({type:'image',source:{type:'base64',media_type:img.mediaType,data:img.data}})),
+        {type:'text',text:prompt},
+      ];
+      const res=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,
+          system:'Extract values from app screenshots. Return ONLY valid JSON. No markdown no code fences no explanation.',
+          messages:[{role:'user',content}]})
+      });
+      const d=await res.json();
+      if(d.error)throw new Error(d.error.message);
+      const text=d.content?.[0]?.text||'{}';
+      const parsed=JSON.parse(text.replace(/```[\w]*/g,'').replace(/```/g,'').trim());
+      setExtracted(parsed);setStatus('preview');
+    }catch(err){setErrMsg(err.message);setStatus('error');}
+  };
+  const apply=()=>{onApply(extracted);setStatus('idle');setExtracted(null);};
+  const dismiss=()=>{setStatus('idle');setExtracted(null);setErrMsg('');};
+
+  if(!apiKey)return(<div style={{padding:'12px 14px',background:'#0d0d0d',border:'1px solid #1e1e1e',borderRadius:10,fontSize:11,color:'#333',fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>Add API key in Settings (⚙) to enable scanning</div>);
+
+  return(<div>
+    <input ref={inputRef} type="file" accept="image/*" multiple={!!multiple} onChange={handleChange} style={{display:'none'}}/>
+    {status==='idle'&&(<div>
+      <button onClick={()=>inputRef.current?.click()} style={{width:'100%',height:52,background:'#0d0d0d',border:'1px dashed #2a2a2a',borderRadius:10,color:'#ff6b2b',fontSize:13,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+        <span style={{fontSize:17}}>◎</span>{label}
+      </button>
+      {hint&&<div style={{fontSize:11,color:'#333',marginTop:6}}>{hint}</div>}
+    </div>)}
+    {status==='loading'&&(<div style={{height:52,display:'flex',alignItems:'center',justifyContent:'center',gap:10,background:'#0d0d0d',border:'1px dashed #1e1e1e',borderRadius:10}}>
+      <div style={{width:14,height:14,border:'2px solid #ff6b2b',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>
+      <span style={{fontSize:11,fontFamily:'Chakra Petch',color:'#444',letterSpacing:'0.1em'}}>READING...</span>
+    </div>)}
+    {status==='preview'&&extracted&&(<div style={{background:'#091209',border:'1px solid #163016',borderRadius:10,padding:16}}>
+      <div style={{fontSize:9,fontFamily:'Chakra Petch',color:'#4ade80',letterSpacing:'0.15em',marginBottom:12}}>SCAN RESULTS — CHECK BEFORE APPLYING</div>
+      {previewLabels.map(l=>(<div key={l.key} style={{display:'flex',justifyContent:'space-between',marginBottom:8,alignItems:'center'}}>
+        <span style={{fontSize:11,color:'#555',fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>{l.label}</span>
+        <span style={{fontSize:14,color:extracted[l.key]!=null?'#e0e0e0':'#333',fontFamily:'monospace'}}>{extracted[l.key]!=null?`${extracted[l.key]}${l.unit||''}`:'—'}</span>
+      </div>))}
+      <div style={{display:'flex',gap:8,marginTop:14}}>
+        <button onClick={dismiss} style={{flex:1,height:40,background:'#111',border:'1px solid #1e1e1e',borderRadius:8,color:'#555',fontSize:12,cursor:'pointer',fontFamily:'Chakra Petch'}}>✕ DISMISS</button>
+        <button onClick={apply} style={{flex:2,height:40,background:'#14532d',border:'1px solid #166534',borderRadius:8,color:'#4ade80',fontSize:13,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>✓ APPLY</button>
+      </div>
+    </div>)}
+    {status==='error'&&(<div style={{background:'#120808',border:'1px solid #2a1010',borderRadius:10,padding:14}}>
+      <div style={{fontSize:12,color:'#f87171',marginBottom:6}}>Scan failed — enter values manually</div>
+      <div style={{fontSize:10,color:'#3a3a3a'}}>{errMsg}</div>
+      <button onClick={dismiss} style={{marginTop:10,height:34,padding:'0 14px',background:'#111',border:'1px solid #1e1e1e',borderRadius:8,color:'#555',fontSize:11,cursor:'pointer',fontFamily:'Chakra Petch'}}>DISMISS</button>
+    </div>)}
+  </div>);
+}
+
+// ── DatePicker ─────────────────────────────────────────────────────────────────
+function DatePicker({date,onChange,label}){
+  const today=tday();
+  const prev=()=>{const d=new Date(date);d.setDate(d.getDate()-1);onChange(d);};
+  const next=()=>{const d=new Date(date);d.setDate(d.getDate()+1);if(dk(d)<=dk(today))onChange(d);};
+  const atMax=dk(date)>=dk(today);
+  return(<div style={{display:'flex',alignItems:'center',background:'#0d0d0d',border:'1px solid #1e1e1e',borderRadius:10,overflow:'hidden',marginBottom:28}}>
+    <button onClick={prev} style={{width:46,height:46,background:'none',border:'none',color:'#555',fontSize:22,cursor:'pointer',flexShrink:0,lineHeight:1}}>‹</button>
+    <div style={{flex:1,textAlign:'center'}}>
+      <div style={{fontSize:9,color:'#333',fontFamily:'Chakra Petch',letterSpacing:'0.12em'}}>{label}</div>
+      <div style={{fontSize:14,color:'#ccc',fontFamily:'Chakra Petch'}}>{fmtDate(date)}</div>
+    </div>
+    <button onClick={next} disabled={atMax} style={{width:46,height:46,background:'none',border:'none',color:atMax?'#1a1a1a':'#555',fontSize:22,cursor:atMax?'default':'pointer',flexShrink:0,lineHeight:1}}>›</button>
+  </div>);
+}
+
+// ── Phase 1 steps ──────────────────────────────────────────────────────────────
+function P1Sleep({data,setData,apiKey}){
+  const upd=(vals)=>setData(p=>({...p,...vals}));
+  return(<div>
+    <ScanButton label="SCAN OURA" hint="Select Sleep screenshot + Readiness screenshot together" multiple
+      prompt={OURA_PROMPT} previewLabels={OURA_LABELS} onApply={upd} apiKey={apiKey}/>
+    <Divider/>
+    <F label="Sleep Score"><Num value={data.sleepScore} onChange={v=>upd({sleepScore:v})} min={0} max={100}/></F>
+    <F label="Sleep Hours"><Num value={data.sleepHours} onChange={v=>upd({sleepHours:v})} min={0} max={13} step={0.25}/></F>
+    <F label="RHR (bpm)"><Num value={data.rhr} onChange={v=>upd({rhr:v})} min={30} max={80}/></F>
+    <F label="HRV"><Num value={data.hrv} onChange={v=>upd({hrv:v})} min={0} max={120}/></F>
+  </div>);
+}
+function P1Weight({data,setData}){
+  return(<F label="Morning Weight (kg)" hint="First thing — before eating or drinking">
+    <Num value={data.weight} onChange={v=>setData(p=>({...p,weight:v}))} min={60} max={130} step={0.05}/>
+  </F>);
+}
+function P1Nutrition({data,setData,apiKey}){
+  const upd=(vals)=>setData(p=>({...p,...vals}));
+  return(<div>
+    <ScanButton label="SCAN NUTRITION" hint="Select yesterday's totals screenshot from your nutrition app"
+      prompt={NUTRITION_PROMPT} previewLabels={NUTRITION_LABELS} onApply={upd} apiKey={apiKey}/>
+    <Divider/>
+    <F label="Calories"><Num value={data.cals} onChange={v=>upd({cals:v})} min={0} max={7000} step={50}/></F>
+    <F label="Protein (g)"><Num value={data.protein} onChange={v=>upd({protein:v})} min={0} max={400} step={5}/></F>
+    <F label="Carbs (g)"><Num value={data.carbs} onChange={v=>upd({carbs:v})} min={0} max={900} step={10}/></F>
+  </div>);
+}
+
+// ── Phase 2 steps ──────────────────────────────────────────────────────────────
+function P2Type({data,setData}){
+  return(<div>
+    <div style={{fontSize:11,color:'#2e2e2e',fontFamily:'Chakra Petch',marginBottom:22,letterSpacing:'0.12em'}}>{new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase()}</div>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+      {WO_TYPES.map(wt=>{const active=data.wo===wt.id;return(
+        <button key={wt.id} onClick={()=>setData(p=>({...p,wo:wt.id}))} style={{height:80,borderRadius:12,cursor:'pointer',
+          background:active?'#ff6b2b':'#0d0d0d',border:`2px solid ${active?'#ff6b2b':'#181818'}`,color:active?'#fff':'#888',
+          display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4,transition:'all 0.14s'}}>
+          <span style={{fontSize:17,fontFamily:'Chakra Petch',fontWeight:700}}>{wt.label}</span>
+          {wt.sub&&<span style={{fontSize:9,color:active?'rgba(255,255,255,0.45)':'#2a2a2a',fontFamily:'Chakra Petch',letterSpacing:'0.1em'}}>{wt.sub.toUpperCase()}</span>}
+        </button>
+      )})}
+    </div>
+  </div>);
+}
+function P2PreSession({data,setData}){
+  const set=(k,v)=>setData(p=>({...p,[k]:v}));
+  return(<div>
+    <F label="Morning Mood / Energy"><Pills options={['1/5','2/5','3/5','4/5','5/5']} value={data.mood} onChange={v=>set('mood',v)}/></F>
+    <F label="Physical Issues"><Txt value={data.physicalIssues} onChange={v=>set('physicalIssues',v)} placeholder="Rib, adductor, back..."/></F>
+    <F label="Jump Height (cm)" hint="Doorframe test — note deviation from your baseline">
+      <Num value={data.jumpHeight} onChange={v=>set('jumpHeight',v)} min={0} max={80} step={0.5}/>
+    </F>
+  </div>);
+}
+function P2Fuel({data,setData}){
+  const set=(k,v)=>setData(p=>({...p,[k]:v}));
+  return(<div>
+    <F label="Pre-Session Carbs (g)"><Num value={data.preCarbs} onChange={v=>set('preCarbs',v)} min={0} max={300} step={5}/></F>
+    <F label="Caffeine (mg)" hint="1 home aeropress ≈ 100mg">
+      <div style={{marginBottom:8}}><Pills options={[0,100,200,300]} value={data.caffeine} onChange={v=>set('caffeine',v)}/></div>
+      <Num value={data.caffeine} onChange={v=>set('caffeine',v)} min={0} max={600} step={25}/>
+    </F>
+    <F label="K-Bicarb (g)"><Num value={data.kBicarb} onChange={v=>set('kBicarb',v)} min={0} max={30} step={0.5}/></F>
+  </div>);
+}
+function P2Session({data,setData,isSubT,apiKey}){
+  const set=(k,v)=>setData(p=>({...p,[k]:v}));
+  const upd=(vals)=>setData(p=>({...p,...vals}));
+  return(<div>
+    <ScanButton label="SCAN COROS"
+      hint={isSubT?'Select summary screenshot + lap breakdown screenshot':'Select activity summary screenshot'}
+      multiple={isSubT}
+      prompt={isSubT?COROS_SUBT_PROMPT:COROS_EASY_PROMPT}
+      previewLabels={COROS_LABELS} onApply={upd} apiKey={apiKey}/>
+    <Divider/>
+    <F label={isSubT?'Avg Pace — intervals only (MM:SS)':'Avg Pace (MM:SS)'}><Txt value={data.avgPace} onChange={v=>set('avgPace',v)} placeholder="04:12" inputMode="numeric"/></F>
+    <F label={isSubT?'Avg HR — intervals only (bpm)':'Avg HR (bpm)'}><Num value={data.avgHR} onChange={v=>set('avgHR',v)} min={100} max={220}/></F>
+    <F label="Total KM"><Num value={data.totalKM} onChange={v=>set('totalKM',v)} min={0} max={50} step={0.1}/></F>
+    <F label="Total Time (H:MM:SS)"><Txt value={data.totalTime} onChange={v=>set('totalTime',v)} placeholder="0:50:56" inputMode="numeric"/></F>
+    <F label="Coros Load"><Num value={data.corosLoad} onChange={v=>set('corosLoad',v)} min={0} max={500}/></F>
+    <F label={`RPE${data.rpe?': '+data.rpe+'/10':''}`}>
+      <input type="range" min={1} max={10} step={0.5} value={data.rpe||5} onChange={ev=>set('rpe',ev.target.value)} style={{width:'100%',cursor:'pointer',height:34,marginTop:6}}/>
+      <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:'#2e2e2e',fontFamily:'monospace',marginTop:3}}><span>1 easy</span><span>5</span><span>10 max</span></div>
+    </F>
+  </div>);
+}
+function P2PostSession({data,setData}){
+  const set=(k,v)=>setData(p=>({...p,[k]:v}));
+  return(<div>
+    <F label="In-Session Carbs (g)"><Num value={data.inCarbs} onChange={v=>set('inCarbs',v)} min={0} max={150} step={5}/></F>
+    <F label="Running Extras"><Txt value={data.runningExtras} onChange={v=>set('runningExtras',v)} placeholder="Hill repeats, strides..."/></F>
+    <F label="Running Extras Load (Coros)"><Num value={data.runningExtrasLoad} onChange={v=>set('runningExtrasLoad',v)} min={0} max={200}/></F>
+    <F label="Upper Body Sets" hint="Standard = 16"><Pills options={[0,8,12,16]} value={data.ubSets} onChange={v=>set('ubSets',v)}/></F>
+    <F label="Lower Body Sets"><Num value={data.lbSets} onChange={v=>set('lbSets',v)} min={0} max={20}/></F>
+  </div>);
+}
+function P2Notes({data,setData,isOff}){
+  const set=(k,v)=>setData(p=>({...p,[k]:v}));
+  return(<div>
+    {isOff&&<F label="Upper Body Sets" hint="Standard = 16"><Pills options={[0,8,12,16]} value={data.ubSets} onChange={v=>set('ubSets',v)}/></F>}
+    <F label="Weather (if notable)"><Txt value={data.weather} onChange={v=>set('weather',v)} placeholder="Very cold, windy, track..."/></F>
+    <F label="Training Notes"><Txt value={data.trainingNotes} onChange={v=>set('trainingNotes',v)} placeholder="Treadmill, with Matti, felt strong..." rows={2}/></F>
+    <F label="Stress / Lifestyle"><Txt value={data.stress} onChange={v=>set('stress',v)} placeholder="Lower cals, nap..."/></F>
+  </div>);
+}
+
+// ── Results ────────────────────────────────────────────────────────────────────
+function ResultsScreen({p1Row,p2Row,p1Date,p2Date,insight,loadingInsight,p1Skipped,onNew}){
+  const [c1,setC1]=useState(false),[c2,setC2]=useState(false);
+  const cp=(text,set)=>copyText(text,()=>{set(true);setTimeout(()=>set(false),2500)});
+  const card={background:'#0a0a0a',border:'1px solid #141414',borderRadius:14,padding:20,marginBottom:14};
+  const tag={fontSize:9,fontFamily:'Chakra Petch,monospace',letterSpacing:'0.16em',marginBottom:10};
+  return(<div style={{animation:'fadeIn 0.3s ease'}}>
+    <div style={{fontSize:22,fontFamily:'Chakra Petch',color:'#ff6b2b',letterSpacing:'0.06em',marginBottom:2}}>ALL DONE ✓</div>
+    <div style={{fontSize:10,color:'#282828',fontFamily:'Chakra Petch',letterSpacing:'0.12em',marginBottom:28}}>{new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase()}</div>
+
+    {!p1Skipped&&p1Row&&(<div style={card}>
+      <div style={{...tag,color:'#888'}}>CLOSE OUT — {fmtDate(p1Date).toUpperCase()}</div>
+      <div style={{fontSize:11,color:'#333',marginBottom:10}}>Paste <span style={{color:'#888'}}>OVER</span> the {fmtDate(p1Date)} row in your sheet</div>
+      <button onClick={()=>cp(p1Row,setC1)} style={{width:'100%',height:44,borderRadius:8,cursor:'pointer',transition:'all 0.2s',
+        background:c1?'#14532d':'#0d0d0d',border:`1px solid ${c1?'#166534':'#1e1e1e'}`,
+        color:c1?'#4ade80':'#555',fontSize:12,fontFamily:'Chakra Petch',letterSpacing:'0.1em'}}>
+        {c1?'✓ COPIED':'COPY UPDATED ROW'}
+      </button>
+    </div>)}
+
+    <div style={card}>
+      <div style={{...tag,color:'#ff6b2b'}}>TODAY — {fmtDate(p2Date).toUpperCase()}</div>
+      <div style={{fontSize:11,color:'#333',marginBottom:10}}>Paste at <span style={{color:'#888'}}>BOTTOM</span> of your sheet</div>
+      <button onClick={()=>cp(p2Row,setC2)} style={{width:'100%',height:44,borderRadius:8,cursor:'pointer',transition:'all 0.2s',
+        background:c2?'#14532d':'#0d0d0d',border:`1px solid ${c2?'#166534':'#1e1e1e'}`,
+        color:c2?'#4ade80':'#555',fontSize:12,fontFamily:'Chakra Petch',letterSpacing:'0.1em'}}>
+        {c2?'✓ COPIED':'COPY NEW ROW'}
+      </button>
+    </div>
+
+    {(insight||loadingInsight)&&(<div style={card}>
+      <div style={{...tag,color:'#ff6b2b'}}>COACH ANALYSIS</div>
+      {loadingInsight
+        ?<div style={{display:'flex',alignItems:'center',gap:12,padding:'6px 0'}}>
+          <div style={{width:14,height:14,border:'2px solid #ff6b2b',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.7s linear infinite',flexShrink:0}}/>
+          <span style={{fontSize:11,fontFamily:'Chakra Petch',color:'#333',letterSpacing:'0.1em'}}>ANALYZING...</span>
+        </div>
+        :<div style={{fontSize:14,lineHeight:1.8,color:'#bbb',whiteSpace:'pre-wrap'}}>{insight}</div>}
+    </div>)}
+
+    <button onClick={onNew} style={{width:'100%',height:50,background:'#090909',border:'1px solid #121212',borderRadius:12,color:'#3a3a3a',fontSize:12,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',marginTop:4}}>+ NEW ENTRY</button>
+  </div>);
+}
+
+// ── Settings ───────────────────────────────────────────────────────────────────
+function SettingsScreen({apiKey,setApiKey,onSave,onCancel}){
+  return(<div style={{animation:'fadeIn 0.2s ease'}}>
+    <div style={{fontSize:14,fontFamily:'Chakra Petch',color:'#ff6b2b',letterSpacing:'0.12em',marginBottom:28}}>SETTINGS</div>
+    <F label="Anthropic API Key" hint="console.anthropic.com — stored locally on this device only">
+      <input type="password" value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="sk-ant-api03-..."
+        style={{width:'100%',height:46,background:'#0d0d0d',border:'1px solid #1e1e1e',borderRadius:8,color:'#f0f0f0',fontSize:14,padding:'0 12px',fontFamily:'monospace'}}/>
+    </F>
+    <div style={{fontSize:11,color:'#2e2e2e',lineHeight:1.75,marginBottom:28}}>Required for screenshot scanning and post-entry analysis. Logging and CSV export work without a key. Cost is under $0.01 per session.</div>
+    <button onClick={onSave} style={{width:'100%',height:52,background:'#ff6b2b',border:'none',borderRadius:12,color:'#fff',fontSize:13,fontFamily:'Chakra Petch',letterSpacing:'0.08em',cursor:'pointer',marginBottom:10}}>SAVE</button>
+    <button onClick={onCancel} style={{width:'100%',height:44,background:'none',border:'1px solid #141414',borderRadius:12,color:'#333',fontSize:12,fontFamily:'Chakra Petch',cursor:'pointer'}}>CANCEL</button>
+  </div>);
+}
+
+// ── Main App ───────────────────────────────────────────────────────────────────
+function App(){
+  const [screen,setScreen]=useState('p1');
+  const [prevScreen,setPrevScreen]=useState('p1');
+  const [p1Step,setP1Step]=useState(0);
+  const [p1Date,setP1Date]=useState(yday());
+  const [p1Data,setP1Data]=useState({...P1_EMPTY});
+  const [p1Skipped,setP1Skipped]=useState(false);
+  const [p2Step,setP2Step]=useState(0);
+  const [p2Date,setP2Date]=useState(tday());
+  const [p2Data,setP2Data]=useState({...P2_EMPTY});
+  const [allEntries,setAllEntries]=useState({});
+  const [apiKey,setApiKey]=useState('');
+  const [insight,setInsight]=useState('');
+  const [loadingInsight,setLoadingInsight]=useState(false);
+  const [p1Row,setP1Row]=useState('');
+  const [p2Row,setP2Row]=useState('');
+
+  useEffect(()=>{
+    setApiKey(ls.get('rbl_key')||'');
+    setAllEntries(ls.get('rbl_entries')||{});
+  },[]);
+
+  useEffect(()=>{
+    const e=allEntries[dk(p1Date)]||{};
+    setP1Data({sleepScore:e.sleepScore||'',sleepHours:e.sleepHours||'',rhr:e.rhr||'',hrv:e.hrv||'',cals:e.cals||'',protein:e.protein||'',carbs:e.carbs||'',weight:e.weight||''});
+  },[p1Date]); // eslint-disable-line
+
+  useEffect(()=>{
+    const e=allEntries[dk(p2Date)]||{};
+    if(e.wo)setP2Data({wo:e.wo||'',avgPace:e.avgPace||'',avgHR:e.avgHR||'',totalKM:e.totalKM||'',totalTime:e.totalTime||'',corosLoad:e.corosLoad||'',rpe:e.rpe||'',preCarbs:e.preCarbs||'',caffeine:e.caffeine||'',kBicarb:e.kBicarb||'',inCarbs:e.inCarbs||'',runningExtras:e.runningExtras||'',runningExtrasLoad:e.runningExtrasLoad||'',ubSets:e.ubSets||'',lbSets:e.lbSets||'',mood:e.mood||'',physicalIssues:e.physicalIssues||'',jumpHeight:e.jumpHeight||'',weather:e.weather||'',trainingNotes:e.trainingNotes||'',stress:e.stress||''});
+  },[p2Date]); // eslint-disable-line
+
+  const isOff=p2Data.wo==='OFF';
+  const isSubT=SUB_T.includes(p2Data.wo);
+  const P1_STEPS=['sleep','weight','nutrition'];
+  const p1IsLast=p1Step===P1_STEPS.length-1;
+  const p2Steps=isOff?['type','notes']:['type','presession','fuel','session','postsession','notes'];
+  const p2IsLast=p2Step===p2Steps.length-1;
+  const p2CanNext=p2Step===0?p2Data.wo!=='':true;
+
+  const saveAndMerge=(key,updates)=>{
+    const existing=allEntries[key]||{};
+    const merged={...existing,...updates};
+    const updated={...allEntries,[key]:merged};
+    setAllEntries(updated);ls.set('rbl_entries',updated);
+    return merged;
+  };
+
+  const finishP1=()=>{
+    const merged=saveAndMerge(dk(p1Date),p1Data);
+    setP1Row(formatRow(merged,p1Date));setScreen('p2');
+  };
+  const skipP1=()=>{setP1Skipped(true);setScreen('p2');};
+
+  const finishP2=async()=>{
+    const p2merged=saveAndMerge(dk(p2Date),p2Data);
+    const p1merged=allEntries[dk(p1Date)]||{};
+    setP1Row(formatRow(p1merged,p1Date));
+    setP2Row(formatRow(p2merged,p2Date));
+    setScreen('results');
+    if(apiKey&&p2Data.wo&&p2Data.wo!=='OFF'){
+      setLoadingInsight(true);
+      fetchInsight(p2merged,Object.values(allEntries).slice(0,10));
+    }
+  };
+
+  const fetchInsight=async(todayEntry,recent)=>{
+    try{
+      const res=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,
+          system:`Elite endurance coach analyzing data for Rob, male b.Feb 1977, Toronto.
+Profile: Norwegian Singles Method ~80km/week, subT sessions 10×3:00/5×6:00/3×10:00. Target sub-1:30 HM, fitness ~1:26-1:27. UB calisthenics 3×/week max effort 16 sets 24min fixed. High protein 180-200g/day, ~300kcal deficit easy days. Oura (HRV/sleep), Coros Pace 4 (load/pace). Experiments: K-bicarb (buffering), caffeine (aeropress≈100mg). Jump height=doorframe readiness test. Recurring: rib head sublux, back, adductor. Pace progress: 10×3 4:47→4:02, 5×6 4:30→4:10, 3×10 4:45→4:11.
+Give 3–5 SHORT bullet insights. Direct, cite numbers, flag anomalies vs recent history. No preamble.`,
+          messages:[{role:'user',content:`Today:\n${JSON.stringify(todayEntry,null,2)}\n\nRecent:\n${JSON.stringify(recent,null,2)}`}]})
+      });
+      const d=await res.json();
+      setInsight(d.error?`API error: ${d.error.message}`:(d.content?.[0]?.text||'No insight returned.'));
+    }catch(e){setInsight(`Connection error: ${e.message}`);}
+    finally{setLoadingInsight(false);}
+  };
+
+  const openSettings=()=>{setPrevScreen(screen);setScreen('settings');};
+  const saveSettings=()=>{ls.set('rbl_key',apiKey);setScreen(prevScreen);};
+  const cancelSettings=()=>setScreen(prevScreen);
+
+  const reset=()=>{
+    setScreen('p1');setP1Step(0);setP2Step(0);
+    setP1Date(yday());setP2Date(tday());
+    setP1Data({...P1_EMPTY});setP2Data({...P2_EMPTY});
+    setP1Skipped(false);setInsight('');setP1Row('');setP2Row('');setLoadingInsight(false);
+  };
+
+  const ProgressBar=({step,total,color,label})=>(
+    <div style={{marginBottom:28}}>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+        <div style={{fontSize:9,fontFamily:'Chakra Petch',color:'#282828',letterSpacing:'0.12em'}}>STEP {step+1} / {total}</div>
+        <div style={{fontSize:10,fontFamily:'Chakra Petch',color:color,letterSpacing:'0.1em'}}>{label}</div>
+      </div>
+      <div style={{height:2,background:'#111',borderRadius:1}}>
+        <div style={{height:'100%',width:`${((step+1)/total)*100}%`,background:color,borderRadius:1,transition:'width 0.3s ease'}}/>
+      </div>
+    </div>
+  );
+
+  const NavRow=({step,setStep,isLast,canNext,onFinish,finishLabel,accent})=>(
+    <div style={{display:'flex',gap:10,marginTop:36}}>
+      {step>0&&<button onClick={()=>setStep(s=>s-1)} style={{flex:1,height:52,background:'#090909',border:'1px solid #141414',borderRadius:12,color:'#444',fontSize:13,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>← BACK</button>}
+      {!isLast
+        ?<button onClick={()=>canNext&&setStep(s=>s+1)} style={{flex:1,height:52,borderRadius:12,border:'none',fontSize:13,
+            background:canNext?accent:(accent==='#888'?'#1a1a1a':'#160d04'),
+            color:canNext?'#fff':(accent==='#888'?'#2e2e2e':'#3a1e08'),
+            cursor:canNext?'pointer':'default',fontFamily:'Chakra Petch',letterSpacing:'0.06em',transition:'all 0.15s'}}>NEXT →</button>
+        :<button onClick={onFinish} style={{flex:1,height:52,background:accent,border:'none',borderRadius:12,color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>{finishLabel}</button>
+      }
+    </div>
+  );
+
+  return(<div style={{minHeight:'100vh',background:'#080808',color:'#e0e0e0',fontFamily:'Barlow,sans-serif',maxWidth:480,margin:'0 auto'}}>
+
+    {/* Header */}
+    <div style={{padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid #0e0e0e',position:'sticky',top:0,background:'#080808',zIndex:10}}>
+      <div>
+        <div style={{fontSize:11,fontFamily:'Chakra Petch',letterSpacing:'0.18em',color:'#ff6b2b'}}>ROB'S BODY LAB</div>
+        {screen==='p1'&&<div style={{fontSize:8,color:'#2e2e2e',fontFamily:'Chakra Petch',letterSpacing:'0.12em',marginTop:2}}>PHASE 1: CLOSE OUT</div>}
+        {screen==='p2'&&<div style={{fontSize:8,color:'#2e2e2e',fontFamily:'Chakra Petch',letterSpacing:'0.12em',marginTop:2}}>PHASE 2: LOG TODAY</div>}
+      </div>
+      <div style={{display:'flex',gap:14,alignItems:'center'}}>
+        {screen==='p1'&&<button onClick={skipP1} style={{background:'none',border:'1px solid #1e1e1e',borderRadius:6,color:'#444',fontSize:10,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',padding:'6px 10px',lineHeight:1}}>SKIP →</button>}
+        {screen==='results'&&<button onClick={reset} style={{background:'none',border:'none',color:'#333',fontSize:11,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.1em',padding:0}}>+ NEW</button>}
+        <button onClick={screen==='settings'?cancelSettings:openSettings}
+          style={{background:'none',border:'none',color:screen==='settings'?'#ff6b2b':'#282828',fontSize:19,cursor:'pointer',lineHeight:1,padding:0}}>⚙</button>
+      </div>
+    </div>
+
+    {/* Body */}
+    <div style={{padding:'24px 20px 88px'}}>
+      {screen==='settings'&&<SettingsScreen apiKey={apiKey} setApiKey={setApiKey} onSave={saveSettings} onCancel={cancelSettings}/>}
+
+      {screen==='p1'&&(<div>
+        <DatePicker date={p1Date} onChange={setP1Date} label="CLOSING OUT"/>
+        <ProgressBar step={p1Step} total={P1_STEPS.length} color="#666" label={P1_STEPS[p1Step].toUpperCase()}/>
+        {p1Step===0&&<P1Sleep data={p1Data} setData={setP1Data} apiKey={apiKey}/>}
+        {p1Step===1&&<P1Weight data={p1Data} setData={setP1Data}/>}
+        {p1Step===2&&<P1Nutrition data={p1Data} setData={setP1Data} apiKey={apiKey}/>}
+        <NavRow step={p1Step} setStep={setP1Step} isLast={p1IsLast} canNext={true} onFinish={finishP1} finishLabel="DONE → LOG TODAY" accent="#666"/>
+      </div>)}
+
+      {screen==='p2'&&(<div>
+        <DatePicker date={p2Date} onChange={setP2Date} label="LOGGING FOR"/>
+        <ProgressBar step={p2Step} total={p2Steps.length} color="#ff6b2b"
+          label={p2Steps[p2Step].replace('presession','PRE-SESSION').replace('postsession','POST-SESSION').toUpperCase()}/>
+        {p2Steps[p2Step]==='type'&&<P2Type data={p2Data} setData={setP2Data}/>}
+        {p2Steps[p2Step]==='presession'&&<P2PreSession data={p2Data} setData={setP2Data}/>}
+        {p2Steps[p2Step]==='fuel'&&<P2Fuel data={p2Data} setData={setP2Data}/>}
+        {p2Steps[p2Step]==='session'&&<P2Session data={p2Data} setData={setP2Data} isSubT={isSubT} apiKey={apiKey}/>}
+        {p2Steps[p2Step]==='postsession'&&<P2PostSession data={p2Data} setData={setP2Data}/>}
+        {p2Steps[p2Step]==='notes'&&<P2Notes data={p2Data} setData={setP2Data} isOff={isOff}/>}
+        <NavRow step={p2Step} setStep={setP2Step} isLast={p2IsLast} canNext={p2CanNext} onFinish={finishP2} finishLabel="LOG IT ✓" accent="#ff6b2b"/>
+      </div>)}
+
+      {screen==='results'&&<ResultsScreen p1Row={p1Row} p2Row={p2Row} p1Date={p1Date} p2Date={p2Date}
+        insight={insight} loadingInsight={loadingInsight} p1Skipped={p1Skipped} onNew={reset}/>}
+    </div>
+  </div>);
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
