@@ -22,7 +22,7 @@
     input[type=range]{-webkit-appearance:none;appearance:none;background:transparent}
     input[type=range]::-webkit-slider-runnable-track{height:4px;background:#1e1e1e;border-radius:2px}
     input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;background:#ff6b2b;border-radius:50%;margin-top:-11px;cursor:pointer}
-    ::placeholder{color:#2a2a2a}
+    ::placeholder{color:#555}
     @keyframes spin{to{transform:rotate(360deg)}}
     @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
   </style>
@@ -99,23 +99,23 @@ const NUTRITION_LABELS=[{key:'cals',label:'Calories'},{key:'protein',label:'Prot
 // ── primitives ─────────────────────────────────────────────────────────────────
 function F({label,hint,children}){
   return(<div style={{marginBottom:22}}>
-    <div style={{fontSize:10,fontFamily:'Chakra Petch,monospace',letterSpacing:'0.13em',color:'#555',textTransform:'uppercase',marginBottom:8}}>{label}</div>
+    <div style={{fontSize:10,fontFamily:'Chakra Petch,monospace',letterSpacing:'0.13em',color:'#aaa',textTransform:'uppercase',marginBottom:8}}>{label}</div>
     {children}
-    {hint&&<div style={{fontSize:11,color:'#333',marginTop:5}}>{hint}</div>}
+    {hint&&<div style={{fontSize:11,color:'#777',marginTop:5}}>{hint}</div>}
   </div>);
 }
 function Num({value,onChange,min=0,max=9999,step=1,placeholder=''}){
   const adj=(d)=>{const next=Math.round(((parseFloat(value)||0)+d*step)*10000)/10000;onChange(String(Math.min(max,Math.max(min,next))))};
-  const btn={width:46,height:46,background:'#111',border:'1px solid #1e1e1e',borderRadius:8,color:'#777',fontSize:24,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,userSelect:'none',lineHeight:'1'};
+  const btn={width:46,height:46,background:'#111',border:'1px solid #1e1e1e',borderRadius:8,color:'#aaa',fontSize:24,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,userSelect:'none',lineHeight:'1'};
   return(<div style={{display:'flex',alignItems:'center',gap:8}}>
     <button style={btn} onClick={()=>adj(-1)}>−</button>
     <input type="number" inputMode="decimal" value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
-      style={{flex:1,height:46,background:'#0d0d0d',border:'1px solid #1e1e1e',borderRadius:8,color:'#f0f0f0',fontSize:18,textAlign:'center',fontFamily:'monospace',padding:'0 6px'}}/>
+      style={{flex:1,height:46,background:'#0d0d0d',border:'1px solid #2a2a2a',borderRadius:8,color:'#f0f0f0',fontSize:18,textAlign:'center',fontFamily:'monospace',padding:'0 6px'}}/>
     <button style={btn} onClick={()=>adj(+1)}>+</button>
   </div>);
 }
 function Txt({value,onChange,placeholder,rows,inputMode}){
-  const base={width:'100%',background:'#0d0d0d',border:'1px solid #1e1e1e',borderRadius:8,color:'#f0f0f0',fontSize:15,fontFamily:'Barlow,sans-serif'};
+  const base={width:'100%',background:'#0d0d0d',border:'1px solid #2a2a2a',borderRadius:8,color:'#f0f0f0',fontSize:15,fontFamily:'Barlow,sans-serif'};
   return rows
     ?<textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{...base,padding:'10px 12px',resize:'none'}}/>
     :<input type="text" inputMode={inputMode||'text'} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={{...base,height:46,padding:'0 12px'}}/>;
@@ -125,7 +125,7 @@ function Pills({options,value,onChange,accent='#ff6b2b'}){
     {options.map(o=>{const active=String(value)===String(o);return(
       <button key={o} onClick={()=>onChange(active?'':String(o))} style={{height:46,padding:'0 16px',borderRadius:8,cursor:'pointer',fontSize:14,
         background:active?accent:'#0d0d0d',border:`1px solid ${active?accent:'#1e1e1e'}`,
-        color:active?'#fff':'#666',fontFamily:'Chakra Petch,monospace',letterSpacing:'0.04em',transition:'all 0.12s'}}>{o}</button>
+        color:active?'#fff':'#aaa',fontFamily:'Chakra Petch,monospace',letterSpacing:'0.04em',transition:'all 0.12s'}}>{o}</button>
     )})}
   </div>);
 }
@@ -152,7 +152,7 @@ function ScanButton({label,hint,multiple,prompt,previewLabels,onApply,apiKey}){
       const res=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
         headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,
+        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:300,
           system:'Extract values from app screenshots. Return ONLY valid JSON. No markdown no code fences no explanation.',
           messages:[{role:'user',content}]})
       });
@@ -166,35 +166,35 @@ function ScanButton({label,hint,multiple,prompt,previewLabels,onApply,apiKey}){
   const apply=()=>{onApply(extracted);setStatus('idle');setExtracted(null);};
   const dismiss=()=>{setStatus('idle');setExtracted(null);setErrMsg('');};
 
-  if(!apiKey)return(<div style={{padding:'12px 14px',background:'#0d0d0d',border:'1px solid #1e1e1e',borderRadius:10,fontSize:11,color:'#333',fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>Add API key in Settings (⚙) to enable scanning</div>);
+  if(!apiKey)return(<div style={{padding:'12px 14px',background:'#0d0d0d',border:'1px solid #1e1e1e',borderRadius:10,fontSize:11,color:'#777',fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>Add API key in Settings (⚙) to enable scanning</div>);
 
   return(<div>
     <input ref={inputRef} type="file" accept="image/*" multiple={!!multiple} onChange={handleChange} style={{display:'none'}}/>
     {status==='idle'&&(<div>
-      <button onClick={()=>inputRef.current?.click()} style={{width:'100%',height:52,background:'#0d0d0d',border:'1px dashed #2a2a2a',borderRadius:10,color:'#ff6b2b',fontSize:13,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+      <button onClick={()=>inputRef.current?.click()} style={{width:'100%',height:52,background:'#0d0d0d',border:'1px dashed #383838',borderRadius:10,color:'#ff6b2b',fontSize:13,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
         <span style={{fontSize:17}}>◎</span>{label}
       </button>
-      {hint&&<div style={{fontSize:11,color:'#333',marginTop:6}}>{hint}</div>}
+      {hint&&<div style={{fontSize:11,color:'#777',marginTop:6}}>{hint}</div>}
     </div>)}
     {status==='loading'&&(<div style={{height:52,display:'flex',alignItems:'center',justifyContent:'center',gap:10,background:'#0d0d0d',border:'1px dashed #1e1e1e',borderRadius:10}}>
       <div style={{width:14,height:14,border:'2px solid #ff6b2b',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>
-      <span style={{fontSize:11,fontFamily:'Chakra Petch',color:'#444',letterSpacing:'0.1em'}}>READING...</span>
+      <span style={{fontSize:11,fontFamily:'Chakra Petch',color:'#888',letterSpacing:'0.1em'}}>READING...</span>
     </div>)}
     {status==='preview'&&extracted&&(<div style={{background:'#091209',border:'1px solid #163016',borderRadius:10,padding:16}}>
       <div style={{fontSize:9,fontFamily:'Chakra Petch',color:'#4ade80',letterSpacing:'0.15em',marginBottom:12}}>SCAN RESULTS — CHECK BEFORE APPLYING</div>
       {previewLabels.map(l=>(<div key={l.key} style={{display:'flex',justifyContent:'space-between',marginBottom:8,alignItems:'center'}}>
-        <span style={{fontSize:11,color:'#555',fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>{l.label}</span>
-        <span style={{fontSize:14,color:extracted[l.key]!=null?'#e0e0e0':'#333',fontFamily:'monospace'}}>{extracted[l.key]!=null?`${extracted[l.key]}${l.unit||''}`:'—'}</span>
+        <span style={{fontSize:11,color:'#aaa',fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>{l.label}</span>
+        <span style={{fontSize:14,color:extracted[l.key]!=null?'#e8e8e8':'#555',fontFamily:'monospace'}}>{extracted[l.key]!=null?`${extracted[l.key]}${l.unit||''}`:'—'}</span>
       </div>))}
       <div style={{display:'flex',gap:8,marginTop:14}}>
-        <button onClick={dismiss} style={{flex:1,height:40,background:'#111',border:'1px solid #1e1e1e',borderRadius:8,color:'#555',fontSize:12,cursor:'pointer',fontFamily:'Chakra Petch'}}>✕ DISMISS</button>
+        <button onClick={dismiss} style={{flex:1,height:40,background:'#111',border:'1px solid #1e1e1e',borderRadius:8,color:'#999',fontSize:12,cursor:'pointer',fontFamily:'Chakra Petch'}}>✕ DISMISS</button>
         <button onClick={apply} style={{flex:2,height:40,background:'#14532d',border:'1px solid #166534',borderRadius:8,color:'#4ade80',fontSize:13,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>✓ APPLY</button>
       </div>
     </div>)}
     {status==='error'&&(<div style={{background:'#120808',border:'1px solid #2a1010',borderRadius:10,padding:14}}>
       <div style={{fontSize:12,color:'#f87171',marginBottom:6}}>Scan failed — enter values manually</div>
-      <div style={{fontSize:10,color:'#3a3a3a'}}>{errMsg}</div>
-      <button onClick={dismiss} style={{marginTop:10,height:34,padding:'0 14px',background:'#111',border:'1px solid #1e1e1e',borderRadius:8,color:'#555',fontSize:11,cursor:'pointer',fontFamily:'Chakra Petch'}}>DISMISS</button>
+      <div style={{fontSize:10,color:'#777'}}>{errMsg}</div>
+      <button onClick={dismiss} style={{marginTop:10,height:34,padding:'0 14px',background:'#111',border:'1px solid #1e1e1e',borderRadius:8,color:'#999',fontSize:11,cursor:'pointer',fontFamily:'Chakra Petch'}}>DISMISS</button>
     </div>)}
   </div>);
 }
@@ -206,12 +206,12 @@ function DatePicker({date,onChange,label}){
   const next=()=>{const d=new Date(date);d.setDate(d.getDate()+1);if(dk(d)<=dk(today))onChange(d);};
   const atMax=dk(date)>=dk(today);
   return(<div style={{display:'flex',alignItems:'center',background:'#0d0d0d',border:'1px solid #1e1e1e',borderRadius:10,overflow:'hidden',marginBottom:28}}>
-    <button onClick={prev} style={{width:46,height:46,background:'none',border:'none',color:'#555',fontSize:22,cursor:'pointer',flexShrink:0,lineHeight:1}}>‹</button>
+    <button onClick={prev} style={{width:46,height:46,background:'none',border:'none',color:'#999',fontSize:22,cursor:'pointer',flexShrink:0,lineHeight:1}}>‹</button>
     <div style={{flex:1,textAlign:'center'}}>
-      <div style={{fontSize:9,color:'#333',fontFamily:'Chakra Petch',letterSpacing:'0.12em'}}>{label}</div>
-      <div style={{fontSize:14,color:'#ccc',fontFamily:'Chakra Petch'}}>{fmtDate(date)}</div>
+      <div style={{fontSize:9,color:'#888',fontFamily:'Chakra Petch',letterSpacing:'0.12em'}}>{label}</div>
+      <div style={{fontSize:14,color:'#e8e8e8',fontFamily:'Chakra Petch'}}>{fmtDate(date)}</div>
     </div>
-    <button onClick={next} disabled={atMax} style={{width:46,height:46,background:'none',border:'none',color:atMax?'#1a1a1a':'#555',fontSize:22,cursor:atMax?'default':'pointer',flexShrink:0,lineHeight:1}}>›</button>
+    <button onClick={next} disabled={atMax} style={{width:46,height:46,background:'none',border:'none',color:atMax?'#282828':'#999',fontSize:22,cursor:atMax?'default':'pointer',flexShrink:0,lineHeight:1}}>›</button>
   </div>);
 }
 
@@ -248,14 +248,14 @@ function P1Nutrition({data,setData,apiKey}){
 // ── Phase 2 steps ──────────────────────────────────────────────────────────────
 function P2Type({data,setData}){
   return(<div>
-    <div style={{fontSize:11,color:'#2e2e2e',fontFamily:'Chakra Petch',marginBottom:22,letterSpacing:'0.12em'}}>{new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase()}</div>
+    <div style={{fontSize:11,color:'#777',fontFamily:'Chakra Petch',marginBottom:22,letterSpacing:'0.12em'}}>{new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase()}</div>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
       {WO_TYPES.map(wt=>{const active=data.wo===wt.id;return(
         <button key={wt.id} onClick={()=>setData(p=>({...p,wo:wt.id}))} style={{height:80,borderRadius:12,cursor:'pointer',
-          background:active?'#ff6b2b':'#0d0d0d',border:`2px solid ${active?'#ff6b2b':'#181818'}`,color:active?'#fff':'#888',
+          background:active?'#ff6b2b':'#0d0d0d',border:`2px solid ${active?'#ff6b2b':'#252525'}`,color:active?'#fff':'#bbb',
           display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4,transition:'all 0.14s'}}>
           <span style={{fontSize:17,fontFamily:'Chakra Petch',fontWeight:700}}>{wt.label}</span>
-          {wt.sub&&<span style={{fontSize:9,color:active?'rgba(255,255,255,0.45)':'#2a2a2a',fontFamily:'Chakra Petch',letterSpacing:'0.1em'}}>{wt.sub.toUpperCase()}</span>}
+          {wt.sub&&<span style={{fontSize:9,color:active?'rgba(255,255,255,0.5)':'#666',fontFamily:'Chakra Petch',letterSpacing:'0.1em'}}>{wt.sub.toUpperCase()}</span>}
         </button>
       )})}
     </div>
@@ -299,7 +299,7 @@ function P2Session({data,setData,isSubT,apiKey}){
     <F label="Coros Load"><Num value={data.corosLoad} onChange={v=>set('corosLoad',v)} min={0} max={500}/></F>
     <F label={`RPE${data.rpe?': '+data.rpe+'/10':''}`}>
       <input type="range" min={1} max={10} step={0.5} value={data.rpe||5} onChange={ev=>set('rpe',ev.target.value)} style={{width:'100%',cursor:'pointer',height:34,marginTop:6}}/>
-      <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:'#2e2e2e',fontFamily:'monospace',marginTop:3}}><span>1 easy</span><span>5</span><span>10 max</span></div>
+      <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:'#777',fontFamily:'monospace',marginTop:3}}><span>1 easy</span><span>5</span><span>10 max</span></div>
     </F>
   </div>);
 }
@@ -331,24 +331,24 @@ function ResultsScreen({p1Row,p2Row,p1Date,p2Date,insight,loadingInsight,p1Skipp
   const tag={fontSize:9,fontFamily:'Chakra Petch,monospace',letterSpacing:'0.16em',marginBottom:10};
   return(<div style={{animation:'fadeIn 0.3s ease'}}>
     <div style={{fontSize:22,fontFamily:'Chakra Petch',color:'#ff6b2b',letterSpacing:'0.06em',marginBottom:2}}>ALL DONE ✓</div>
-    <div style={{fontSize:10,color:'#282828',fontFamily:'Chakra Petch',letterSpacing:'0.12em',marginBottom:28}}>{new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase()}</div>
+    <div style={{fontSize:10,color:'#666',fontFamily:'Chakra Petch',letterSpacing:'0.12em',marginBottom:28}}>{new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase()}</div>
 
     {!p1Skipped&&p1Row&&(<div style={card}>
-      <div style={{...tag,color:'#888'}}>CLOSE OUT — {fmtDate(p1Date).toUpperCase()}</div>
-      <div style={{fontSize:11,color:'#333',marginBottom:10}}>Paste <span style={{color:'#888'}}>OVER</span> the {fmtDate(p1Date)} row in your sheet</div>
+      <div style={{...tag,color:'#bbb'}}>CLOSE OUT — {fmtDate(p1Date).toUpperCase()}</div>
+      <div style={{fontSize:11,color:'#999',marginBottom:10}}>Paste <span style={{color:'#ddd'}}>OVER</span> the {fmtDate(p1Date)} row in your sheet</div>
       <button onClick={()=>cp(p1Row,setC1)} style={{width:'100%',height:44,borderRadius:8,cursor:'pointer',transition:'all 0.2s',
         background:c1?'#14532d':'#0d0d0d',border:`1px solid ${c1?'#166534':'#1e1e1e'}`,
-        color:c1?'#4ade80':'#555',fontSize:12,fontFamily:'Chakra Petch',letterSpacing:'0.1em'}}>
+        color:c1?'#4ade80':'#aaa',fontSize:12,fontFamily:'Chakra Petch',letterSpacing:'0.1em'}}>
         {c1?'✓ COPIED':'COPY UPDATED ROW'}
       </button>
     </div>)}
 
     <div style={card}>
       <div style={{...tag,color:'#ff6b2b'}}>TODAY — {fmtDate(p2Date).toUpperCase()}</div>
-      <div style={{fontSize:11,color:'#333',marginBottom:10}}>Paste at <span style={{color:'#888'}}>BOTTOM</span> of your sheet</div>
+      <div style={{fontSize:11,color:'#999',marginBottom:10}}>Paste at <span style={{color:'#ddd'}}>BOTTOM</span> of your sheet</div>
       <button onClick={()=>cp(p2Row,setC2)} style={{width:'100%',height:44,borderRadius:8,cursor:'pointer',transition:'all 0.2s',
         background:c2?'#14532d':'#0d0d0d',border:`1px solid ${c2?'#166534':'#1e1e1e'}`,
-        color:c2?'#4ade80':'#555',fontSize:12,fontFamily:'Chakra Petch',letterSpacing:'0.1em'}}>
+        color:c2?'#4ade80':'#aaa',fontSize:12,fontFamily:'Chakra Petch',letterSpacing:'0.1em'}}>
         {c2?'✓ COPIED':'COPY NEW ROW'}
       </button>
     </div>
@@ -358,12 +358,12 @@ function ResultsScreen({p1Row,p2Row,p1Date,p2Date,insight,loadingInsight,p1Skipp
       {loadingInsight
         ?<div style={{display:'flex',alignItems:'center',gap:12,padding:'6px 0'}}>
           <div style={{width:14,height:14,border:'2px solid #ff6b2b',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.7s linear infinite',flexShrink:0}}/>
-          <span style={{fontSize:11,fontFamily:'Chakra Petch',color:'#333',letterSpacing:'0.1em'}}>ANALYZING...</span>
+          <span style={{fontSize:11,fontFamily:'Chakra Petch',color:'#777',letterSpacing:'0.1em'}}>ANALYZING...</span>
         </div>
-        :<div style={{fontSize:14,lineHeight:1.8,color:'#bbb',whiteSpace:'pre-wrap'}}>{insight}</div>}
+        :<div style={{fontSize:14,lineHeight:1.8,color:'#ddd',whiteSpace:'pre-wrap'}}>{insight}</div>}
     </div>)}
 
-    <button onClick={onNew} style={{width:'100%',height:50,background:'#090909',border:'1px solid #121212',borderRadius:12,color:'#3a3a3a',fontSize:12,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',marginTop:4}}>+ NEW ENTRY</button>
+    <button onClick={onNew} style={{width:'100%',height:50,background:'#090909',border:'1px solid #121212',borderRadius:12,color:'#888',fontSize:12,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',marginTop:4}}>+ NEW ENTRY</button>
   </div>);
 }
 
@@ -375,9 +375,9 @@ function SettingsScreen({apiKey,setApiKey,onSave,onCancel}){
       <input type="password" value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="sk-ant-api03-..."
         style={{width:'100%',height:46,background:'#0d0d0d',border:'1px solid #1e1e1e',borderRadius:8,color:'#f0f0f0',fontSize:14,padding:'0 12px',fontFamily:'monospace'}}/>
     </F>
-    <div style={{fontSize:11,color:'#2e2e2e',lineHeight:1.75,marginBottom:28}}>Required for screenshot scanning and post-entry analysis. Logging and CSV export work without a key. Cost is under $0.01 per session.</div>
+    <div style={{fontSize:11,color:'#777',lineHeight:1.75,marginBottom:28}}>Required for screenshot scanning and post-entry analysis. Logging and CSV export work without a key. Cost is under $0.01 per session.</div>
     <button onClick={onSave} style={{width:'100%',height:52,background:'#ff6b2b',border:'none',borderRadius:12,color:'#fff',fontSize:13,fontFamily:'Chakra Petch',letterSpacing:'0.08em',cursor:'pointer',marginBottom:10}}>SAVE</button>
-    <button onClick={onCancel} style={{width:'100%',height:44,background:'none',border:'1px solid #141414',borderRadius:12,color:'#333',fontSize:12,fontFamily:'Chakra Petch',cursor:'pointer'}}>CANCEL</button>
+    <button onClick={onCancel} style={{width:'100%',height:44,background:'none',border:'1px solid #141414',borderRadius:12,color:'#999',fontSize:12,fontFamily:'Chakra Petch',cursor:'pointer'}}>CANCEL</button>
   </div>);
 }
 
@@ -453,7 +453,7 @@ function App(){
       const res=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
         headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,
+        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:800,
           system:`Elite endurance coach analyzing data for Rob, male b.Feb 1977, Toronto.
 Profile: Norwegian Singles Method ~80km/week, subT sessions 10×3:00/5×6:00/3×10:00. Target sub-1:30 HM, fitness ~1:26-1:27. UB calisthenics 3×/week max effort 16 sets 24min fixed. High protein 180-200g/day, ~300kcal deficit easy days. Oura (HRV/sleep), Coros Pace 4 (load/pace). Experiments: K-bicarb (buffering), caffeine (aeropress≈100mg). Jump height=doorframe readiness test. Recurring: rib head sublux, back, adductor. Pace progress: 10×3 4:47→4:02, 5×6 4:30→4:10, 3×10 4:45→4:11.
 Give 3–5 SHORT bullet insights. Direct, cite numbers, flag anomalies vs recent history. No preamble.`,
@@ -479,7 +479,7 @@ Give 3–5 SHORT bullet insights. Direct, cite numbers, flag anomalies vs recent
   const ProgressBar=({step,total,color,label})=>(
     <div style={{marginBottom:28}}>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
-        <div style={{fontSize:9,fontFamily:'Chakra Petch',color:'#282828',letterSpacing:'0.12em'}}>STEP {step+1} / {total}</div>
+        <div style={{fontSize:9,fontFamily:'Chakra Petch',color:'#666',letterSpacing:'0.12em'}}>STEP {step+1} / {total}</div>
         <div style={{fontSize:10,fontFamily:'Chakra Petch',color:color,letterSpacing:'0.1em'}}>{label}</div>
       </div>
       <div style={{height:2,background:'#111',borderRadius:1}}>
@@ -490,11 +490,11 @@ Give 3–5 SHORT bullet insights. Direct, cite numbers, flag anomalies vs recent
 
   const NavRow=({step,setStep,isLast,canNext,onFinish,finishLabel,accent})=>(
     <div style={{display:'flex',gap:10,marginTop:36}}>
-      {step>0&&<button onClick={()=>setStep(s=>s-1)} style={{flex:1,height:52,background:'#090909',border:'1px solid #141414',borderRadius:12,color:'#444',fontSize:13,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>← BACK</button>}
+      {step>0&&<button onClick={()=>setStep(s=>s-1)} style={{flex:1,height:52,background:'#090909',border:'1px solid #141414',borderRadius:12,color:'#999',fontSize:13,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>← BACK</button>}
       {!isLast
         ?<button onClick={()=>canNext&&setStep(s=>s+1)} style={{flex:1,height:52,borderRadius:12,border:'none',fontSize:13,
             background:canNext?accent:(accent==='#888'?'#1a1a1a':'#160d04'),
-            color:canNext?'#fff':(accent==='#888'?'#2e2e2e':'#3a1e08'),
+            color:canNext?'#fff':(accent==='#888'?'#555':'#3a1e08'),
             cursor:canNext?'pointer':'default',fontFamily:'Chakra Petch',letterSpacing:'0.06em',transition:'all 0.15s'}}>NEXT →</button>
         :<button onClick={onFinish} style={{flex:1,height:52,background:accent,border:'none',borderRadius:12,color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>{finishLabel}</button>
       }
@@ -507,14 +507,14 @@ Give 3–5 SHORT bullet insights. Direct, cite numbers, flag anomalies vs recent
     <div style={{padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid #0e0e0e',position:'sticky',top:0,background:'#080808',zIndex:10}}>
       <div>
         <div style={{fontSize:11,fontFamily:'Chakra Petch',letterSpacing:'0.18em',color:'#ff6b2b'}}>ROB'S BODY LAB</div>
-        {screen==='p1'&&<div style={{fontSize:8,color:'#2e2e2e',fontFamily:'Chakra Petch',letterSpacing:'0.12em',marginTop:2}}>PHASE 1: CLOSE OUT</div>}
-        {screen==='p2'&&<div style={{fontSize:8,color:'#2e2e2e',fontFamily:'Chakra Petch',letterSpacing:'0.12em',marginTop:2}}>PHASE 2: LOG TODAY</div>}
+        {screen==='p1'&&<div style={{fontSize:8,color:'#777',fontFamily:'Chakra Petch',letterSpacing:'0.12em',marginTop:2}}>PHASE 1: CLOSE OUT</div>}
+        {screen==='p2'&&<div style={{fontSize:8,color:'#777',fontFamily:'Chakra Petch',letterSpacing:'0.12em',marginTop:2}}>PHASE 2: LOG TODAY</div>}
       </div>
       <div style={{display:'flex',gap:14,alignItems:'center'}}>
-        {screen==='p1'&&<button onClick={skipP1} style={{background:'none',border:'1px solid #1e1e1e',borderRadius:6,color:'#444',fontSize:10,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',padding:'6px 10px',lineHeight:1}}>SKIP →</button>}
-        {screen==='results'&&<button onClick={reset} style={{background:'none',border:'none',color:'#333',fontSize:11,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.1em',padding:0}}>+ NEW</button>}
+        {screen==='p1'&&<button onClick={skipP1} style={{background:'none',border:'1px solid #333',borderRadius:6,color:'#999',fontSize:10,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',padding:'6px 10px',lineHeight:1}}>SKIP →</button>}
+        {screen==='results'&&<button onClick={reset} style={{background:'none',border:'none',color:'#888',fontSize:11,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.1em',padding:0}}>+ NEW</button>}
         <button onClick={screen==='settings'?cancelSettings:openSettings}
-          style={{background:'none',border:'none',color:screen==='settings'?'#ff6b2b':'#282828',fontSize:19,cursor:'pointer',lineHeight:1,padding:0}}>⚙</button>
+          style={{background:'none',border:'none',color:screen==='settings'?'#ff6b2b':'#777',fontSize:19,cursor:'pointer',lineHeight:1,padding:0}}>⚙</button>
       </div>
     </div>
 
