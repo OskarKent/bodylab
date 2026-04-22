@@ -349,10 +349,11 @@ function ResultsScreen({p1Row,p2Row,p1Date,p2Date,p1Skipped,onNew,scriptUrl,p1En
     setStatus('loading');
     try{
       const payload=encodeURIComponent(JSON.stringify({values:rowValues(entry,date),date:shortDate(date),mode}));
-      const json=await jsonpFetch(scriptUrl+'?data='+payload);
-      if(setSyncMsg)setSyncMsg(json.message||'');
-      if(json.ok){setStatus('ok');}
-      else{setStatus('err');}
+      // no-cors GET: always permitted by browser, no preflight needed
+      // response is opaque so we can't read it — verify in sheet
+      await fetch(scriptUrl+'?data='+payload,{mode:'no-cors'});
+      setStatus('ok');
+      if(setSyncMsg)setSyncMsg('Request sent — verify in sheet');
     }catch(e){setStatus('err');if(setSyncMsg)setSyncMsg(e.message);}
   };
 
@@ -368,7 +369,7 @@ function ResultsScreen({p1Row,p2Row,p1Date,p2Date,p1Skipped,onNew,scriptUrl,p1En
           color:syncStatus==='ok'?'#4ade80':syncStatus==='err'?'#f87171':syncStatus==='loading'?'#555':'#aaa',
           fontSize:12,fontFamily:'Chakra Petch',letterSpacing:'0.08em',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
           {syncStatus==='loading'&&<div style={{width:10,height:10,border:'2px solid #4ade80',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>}
-          {syncStatus==='ok'?'✓ SYNCED':syncStatus==='err'?'✗ FAILED':syncStatus==='loading'?'SYNCING...':syncLabel}
+          {syncStatus==='ok'?'✓ SENT — CHECK SHEET':syncStatus==='err'?'✗ FAILED':syncStatus==='loading'?'SENDING...':syncLabel}
         </button>)}
         <button onClick={onCopy} style={{flex:scriptUrl?0:1,height:44,padding:scriptUrl?'0 14px':'0',minWidth:scriptUrl?80:0,borderRadius:8,cursor:'pointer',transition:'all 0.2s',
           background:copied?'#14532d':'#0d0d0d',border:`1px solid ${copied?'#166534':'#1e1e1e'}`,
@@ -377,7 +378,7 @@ function ResultsScreen({p1Row,p2Row,p1Date,p2Date,p1Skipped,onNew,scriptUrl,p1En
         </button>
       </div>
       {syncStatus==='err'&&errMsg&&<div style={{fontSize:10,color:'#f87171',marginTop:6,lineHeight:1.5}}>{errMsg}</div>}
-      {syncStatus==='ok'&&errMsg&&<div style={{fontSize:10,color:'#4ade80',marginTop:6,lineHeight:1.5,fontFamily:'monospace'}}>{errMsg}</div>}
+      {syncStatus==='ok'&&<div style={{fontSize:10,color:'#777',marginTop:6,lineHeight:1.5}}>Verify the row landed correctly in your sheet</div>}
     </div>
   );
 
@@ -414,8 +415,8 @@ function SettingsScreen({apiKey,setApiKey,scriptUrl,setScriptUrl,onSave,onCancel
     if(!scriptUrl)return;
     setTesting(true);setTestResult('');
     try{
-      const json=await jsonpFetch(scriptUrl);
-      setTestResult(json.ok?'ok':'err');
+      await fetch(scriptUrl,{mode:'no-cors'});
+      setTestResult('ok'); // no-cors = opaque response, assume live if no error
     }catch(e){
       setTestResult('err');
     }finally{setTesting(false);}
