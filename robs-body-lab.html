@@ -335,8 +335,8 @@ function ResultsScreen({p1Row,p2Row,p1Date,p2Date,p1Skipped,onNew,scriptUrl,p1En
     if(!scriptUrl)return;
     setStatus('loading');
     try{
-      const res=await fetch(scriptUrl,{method:'POST',headers:{'Content-Type':'text/plain'},
-        body:JSON.stringify({values:rowValues(entry,date),date:shortDate(date),mode})});
+      const payload=encodeURIComponent(JSON.stringify({values:rowValues(entry,date),date:shortDate(date),mode}));
+      const res=await fetch(scriptUrl+'?data='+payload);
       const json=await res.json();
       if(setSyncMsg)setSyncMsg(json.message||'');
       if(json.ok){setStatus('ok');}
@@ -402,7 +402,7 @@ function SettingsScreen({apiKey,setApiKey,scriptUrl,setScriptUrl,onSave,onCancel
     if(!scriptUrl)return;
     setTesting(true);setTestResult('');
     try{
-      const res=await fetch(scriptUrl,{method:'GET'});
+      const res=await fetch(scriptUrl);
       const json=await res.json();
       setTestResult(json.ok?'ok':'err');
     }catch(e){
