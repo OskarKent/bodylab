@@ -338,73 +338,64 @@ function P2Notes({data,setData,isOff}){
 }
 
 // ── Results ────────────────────────────────────────────────────────────────────
-function ResultsScreen({p1Row,p2Row,p1Date,p2Date,p1Skipped,onNew,scriptUrl,p1Entry,p2Entry}){
-  const [c1,setC1]=useState(false),[c2,setC2]=useState(false);
-  const [s1,setS1]=useState('idle'),[s2,setS2]=useState('idle');
-  const [msg1,setMsg1]=useState(''),[msg2,setMsg2]=useState('');
-  const cp=(text,set)=>copyText(text,()=>{set(true);setTimeout(()=>set(false),2500)});
+function ResultsScreen({p1Row,p2Date,p1Skipped,onNew,scriptUrl,p1Entry,p1Date}){
+  const [syncStatus,setSyncStatus]=useState('idle');
+  const [copied,setCopied]=useState(false);
+  const cp=()=>copyText(p1Row,()=>{setCopied(true);setTimeout(()=>setCopied(false),2500)});
 
-  const sync=async(entry,date,mode,setStatus,setSyncMsg)=>{
+  const sync=async()=>{
     if(!scriptUrl)return;
-    setStatus('loading');
+    setSyncStatus('loading');
     try{
-      const payload=encodeURIComponent(JSON.stringify({values:rowValues(entry,date),date:shortDate(date),mode}));
-      // no-cors GET: always permitted by browser, no preflight needed
-      // response is opaque so we can't read it — verify in sheet
+      const payload=encodeURIComponent(JSON.stringify({values:rowValues(p1Entry,p1Date)}));
       await fetch(scriptUrl+'?data='+payload,{mode:'no-cors'});
-      setStatus('ok');
-      if(setSyncMsg)setSyncMsg('Request sent — verify in sheet');
-    }catch(e){setStatus('err');if(setSyncMsg)setSyncMsg(e.message);}
+      setSyncStatus('ok');
+    }catch(e){setSyncStatus('err');}
   };
 
   const card={background:'#0a0a0a',border:'1px solid #141414',borderRadius:14,padding:20,marginBottom:14};
   const tag={fontSize:9,fontFamily:'Chakra Petch,monospace',letterSpacing:'0.16em',marginBottom:10};
 
-  const SyncRow=({onSync,onCopy,copied,syncStatus,copyLabel,syncLabel,errMsg})=>(
-    <div>
-      <div style={{display:'flex',gap:8}}>
-        {scriptUrl&&(<button onClick={onSync} style={{flex:1,height:44,borderRadius:8,cursor:'pointer',transition:'all 0.2s',
-          background:syncStatus==='ok'?'#14532d':syncStatus==='err'?'#120808':syncStatus==='loading'?'#0a1a0a':'#0d0d0d',
-          border:`1px solid ${syncStatus==='ok'?'#166534':syncStatus==='err'?'#2a1010':'#1e1e1e'}`,
-          color:syncStatus==='ok'?'#4ade80':syncStatus==='err'?'#f87171':syncStatus==='loading'?'#555':'#aaa',
-          fontSize:12,fontFamily:'Chakra Petch',letterSpacing:'0.08em',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
-          {syncStatus==='loading'&&<div style={{width:10,height:10,border:'2px solid #4ade80',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>}
-          {syncStatus==='ok'?'✓ SENT — CHECK SHEET':syncStatus==='err'?'✗ FAILED':syncStatus==='loading'?'SENDING...':syncLabel}
-        </button>)}
-        <button onClick={onCopy} style={{flex:scriptUrl?0:1,height:44,padding:scriptUrl?'0 14px':'0',minWidth:scriptUrl?80:0,borderRadius:8,cursor:'pointer',transition:'all 0.2s',
-          background:copied?'#14532d':'#0d0d0d',border:`1px solid ${copied?'#166534':'#1e1e1e'}`,
-          color:copied?'#4ade80':'#555',fontSize:11,fontFamily:'Chakra Petch',letterSpacing:'0.06em',whiteSpace:'nowrap'}}>
-          {copied?'✓':copyLabel}
-        </button>
-      </div>
-      {syncStatus==='err'&&errMsg&&<div style={{fontSize:10,color:'#f87171',marginTop:6,lineHeight:1.5}}>{errMsg}</div>}
-      {syncStatus==='ok'&&<div style={{fontSize:10,color:'#777',marginTop:6,lineHeight:1.5}}>Verify the row landed correctly in your sheet</div>}
-    </div>
-  );
-
   return(<div style={{animation:'fadeIn 0.3s ease'}}>
     <div style={{fontSize:22,fontFamily:'Chakra Petch',color:'#ff6b2b',letterSpacing:'0.06em',marginBottom:2}}>ALL DONE ✓</div>
     <div style={{fontSize:10,color:'#666',fontFamily:'Chakra Petch',letterSpacing:'0.12em',marginBottom:28}}>{new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase()}</div>
 
+    {/* Completed row — only shown after Phase 1 close-out */}
     {!p1Skipped&&p1Row&&(<div style={card}>
-      <div style={{...tag,color:'#bbb'}}>CLOSE OUT — {fmtDate(p1Date).toUpperCase()}</div>
-      <div style={{fontSize:11,color:'#999',marginBottom:12}}>Updates {fmtDate(p1Date)} row with sleep, HRV &amp; nutrition</div>
-      <SyncRow onSync={()=>sync(p1Entry,p1Date,'update',setS1,setMsg1)} onCopy={()=>cp(p1Row,setC1)}
-        copied={c1} syncStatus={s1} copyLabel="COPY CSV" syncLabel="↑ SYNC TO SHEET" errMsg={msg1}/>
+      <div style={{...tag,color:'#4ade80'}}>COMPLETE ROW — {fmtDate(p1Date).toUpperCase()}</div>
+      <div style={{fontSize:11,color:'#999',marginBottom:14}}>Session + sleep + nutrition — ready to log</div>
+      <div style={{display:'flex',gap:8}}>
+        {scriptUrl&&(<button onClick={sync} style={{flex:1,height:44,borderRadius:8,cursor:'pointer',transition:'all 0.2s',
+          background:syncStatus==='ok'?'#14532d':syncStatus==='loading'?'#0a1a0a':'#0d0d0d',
+          border:`1px solid ${syncStatus==='ok'?'#166534':'#1e1e1e'}`,
+          color:syncStatus==='ok'?'#4ade80':syncStatus==='loading'?'#555':'#aaa',
+          fontSize:12,fontFamily:'Chakra Petch',letterSpacing:'0.08em',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+          {syncStatus==='loading'&&<div style={{width:10,height:10,border:'2px solid #4ade80',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>}
+          {syncStatus==='ok'?'✓ SENT — CHECK SHEET':syncStatus==='loading'?'SENDING...':'↑ SYNC TO SHEET'}
+        </button>)}
+        <button onClick={cp} style={{flex:scriptUrl?0:1,height:44,padding:scriptUrl?'0 14px':'0',minWidth:scriptUrl?80:0,
+          borderRadius:8,cursor:'pointer',transition:'all 0.2s',
+          background:copied?'#14532d':'#0d0d0d',border:`1px solid ${copied?'#166534':'#1e1e1e'}`,
+          color:copied?'#4ade80':'#555',fontSize:11,fontFamily:'Chakra Petch',letterSpacing:'0.06em',whiteSpace:'nowrap'}}>
+          {copied?'✓':'COPY CSV'}
+        </button>
+      </div>
+      {syncStatus==='ok'&&<div style={{fontSize:10,color:'#777',marginTop:8}}>Check the last row of your sheet to confirm</div>}
     </div>)}
 
+    {/* Today's session — saved locally, syncs tomorrow after close-out */}
     <div style={card}>
       <div style={{...tag,color:'#ff6b2b'}}>TODAY — {fmtDate(p2Date).toUpperCase()}</div>
-      <div style={{fontSize:11,color:'#999',marginBottom:12}}>Adds new row for today's session</div>
-      <SyncRow onSync={()=>sync(p2Entry,p2Date,'append',setS2,setMsg2)} onCopy={()=>cp(p2Row,setC2)}
-        copied={c2} syncStatus={s2} copyLabel="COPY CSV" syncLabel="↑ SYNC TO SHEET" errMsg={msg2}/>
+      <div style={{fontSize:13,color:'#888',lineHeight:1.7}}>Session saved locally.</div>
+      <div style={{fontSize:11,color:'#555',marginTop:4}}>Tomorrow morning, complete Phase 1 to add sleep &amp; nutrition — then the full row syncs to your sheet.</div>
     </div>
 
-    {!scriptUrl&&<div style={{fontSize:11,color:'#444',textAlign:'center',marginTop:-6,marginBottom:14,fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>Add Script URL in ⚙ to enable direct sync</div>}
+    {!scriptUrl&&!p1Skipped&&p1Row&&<div style={{fontSize:11,color:'#444',textAlign:'center',marginTop:-6,marginBottom:14,fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>Add Script URL in ⚙ to enable direct sync</div>}
 
     <button onClick={onNew} style={{width:'100%',height:50,background:'#090909',border:'1px solid #121212',borderRadius:12,color:'#888',fontSize:12,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',marginTop:4}}>+ NEW ENTRY</button>
   </div>);
 }
+
 
 // ── Settings ───────────────────────────────────────────────────────────────────
 function SettingsScreen({apiKey,setApiKey,scriptUrl,setScriptUrl,onSave,onCancel}){
@@ -500,12 +491,7 @@ function App(){
   const skipP1=()=>{setP1Skipped(true);setScreen('p2');};
 
   const finishP2=async()=>{
-    const p2merged=saveAndMerge(dk(p2Date),p2Data);
-    const p1merged=allEntries[dk(p1Date)]||{};
-    setP1Entry(p1merged);
-    setP2Entry(p2merged);
-    setP1Row(formatRow(p1merged,p1Date));
-    setP2Row(formatRow(p2merged,p2Date));
+    saveAndMerge(dk(p2Date),p2Data);
     setScreen('results');
   };
 
@@ -590,8 +576,8 @@ function App(){
         <NavRow step={p2Step} setStep={setP2Step} isLast={p2IsLast} canNext={p2CanNext} onFinish={finishP2} finishLabel="LOG IT ✓" accent="#ff6b2b"/>
       </div>)}
 
-      {screen==='results'&&<ResultsScreen p1Row={p1Row} p2Row={p2Row} p1Date={p1Date} p2Date={p2Date}
-        p1Skipped={p1Skipped} onNew={reset} scriptUrl={scriptUrl} p1Entry={p1Entry} p2Entry={p2Entry}/>}
+      {screen==='results'&&<ResultsScreen p1Row={p1Row} p1Date={p1Date} p2Date={p2Date}
+        p1Skipped={p1Skipped} onNew={reset} scriptUrl={scriptUrl} p1Entry={p1Entry}/>}
     </div>
   </div>);
 }
