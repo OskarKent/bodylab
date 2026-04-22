@@ -70,7 +70,7 @@ const formatRow = (entry,date) => {
   const e=entry||{};
   return [dowFull(date),shortDate(date),e.wo,e.avgPace,e.avgHR,e.totalKM,e.totalTime,e.corosLoad,e.rpe,
     e.preCarbs,e.inCarbs,e.caffeine,e.kBicarb,e.mood,e.weather,e.trainingNotes,
-    e.runningExtras,e.runningExtrasLoad,e.ubSets,e.lbSets,e.stress,e.physicalIssues,
+    e.runningExtras,e.runningExtrasLoad,e.ubSets,e.lbSets,e.stress,e.physicalIssues,e.jumpHeight,
     e.sleepHours,e.sleepScore,e.rhr,e.hrv,e.cals,e.protein,e.carbs,e.weight,'',
   ].map(v=>v==null?'':String(v)).join(',');
 };
