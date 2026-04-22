@@ -324,7 +324,7 @@ function P2Notes({data,setData,isOff}){
 }
 
 // ── Results ────────────────────────────────────────────────────────────────────
-function ResultsScreen({p1Row,p2Row,p1Date,p2Date,insight,loadingInsight,p1Skipped,onNew}){
+function ResultsScreen({p1Row,p2Row,p1Date,p2Date,p1Skipped,onNew}){
   const [c1,setC1]=useState(false),[c2,setC2]=useState(false);
   const cp=(text,set)=>copyText(text,()=>{set(true);setTimeout(()=>set(false),2500)});
   const card={background:'#0a0a0a',border:'1px solid #141414',borderRadius:14,padding:20,marginBottom:14};
@@ -353,15 +353,7 @@ function ResultsScreen({p1Row,p2Row,p1Date,p2Date,insight,loadingInsight,p1Skipp
       </button>
     </div>
 
-    {(insight||loadingInsight)&&(<div style={card}>
-      <div style={{...tag,color:'#ff6b2b'}}>COACH ANALYSIS</div>
-      {loadingInsight
-        ?<div style={{display:'flex',alignItems:'center',gap:12,padding:'6px 0'}}>
-          <div style={{width:14,height:14,border:'2px solid #ff6b2b',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.7s linear infinite',flexShrink:0}}/>
-          <span style={{fontSize:11,fontFamily:'Chakra Petch',color:'#777',letterSpacing:'0.1em'}}>ANALYZING...</span>
-        </div>
-        :<div style={{fontSize:14,lineHeight:1.8,color:'#ddd',whiteSpace:'pre-wrap'}}>{insight}</div>}
-    </div>)}
+
 
     <button onClick={onNew} style={{width:'100%',height:50,background:'#090909',border:'1px solid #121212',borderRadius:12,color:'#888',fontSize:12,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',marginTop:4}}>+ NEW ENTRY</button>
   </div>);
@@ -394,8 +386,6 @@ function App(){
   const [p2Data,setP2Data]=useState({...P2_EMPTY});
   const [allEntries,setAllEntries]=useState({});
   const [apiKey,setApiKey]=useState('');
-  const [insight,setInsight]=useState('');
-  const [loadingInsight,setLoadingInsight]=useState(false);
   const [p1Row,setP1Row]=useState('');
   const [p2Row,setP2Row]=useState('');
 
@@ -442,28 +432,9 @@ function App(){
     setP1Row(formatRow(p1merged,p1Date));
     setP2Row(formatRow(p2merged,p2Date));
     setScreen('results');
-    if(apiKey&&p2Data.wo&&p2Data.wo!=='OFF'){
-      setLoadingInsight(true);
-      fetchInsight(p2merged,Object.values(allEntries).slice(0,10));
-    }
   };
 
-  const fetchInsight=async(todayEntry,recent)=>{
-    try{
-      const res=await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:800,
-          system:`Elite endurance coach analyzing data for Rob, male b.Feb 1977, Toronto.
-Profile: Norwegian Singles Method ~80km/week, subT sessions 10×3:00/5×6:00/3×10:00. Target sub-1:30 HM, fitness ~1:26-1:27. UB calisthenics 3×/week max effort 16 sets 24min fixed. High protein 180-200g/day, ~300kcal deficit easy days. Oura (HRV/sleep), Coros Pace 4 (load/pace). Experiments: K-bicarb (buffering), caffeine (aeropress≈100mg). Jump height=doorframe readiness test. Recurring: rib head sublux, back, adductor. Pace progress: 10×3 4:47→4:02, 5×6 4:30→4:10, 3×10 4:45→4:11.
-Give 3–5 SHORT bullet insights. Direct, cite numbers, flag anomalies vs recent history. No preamble.`,
-          messages:[{role:'user',content:`Today:\n${JSON.stringify(todayEntry,null,2)}\n\nRecent:\n${JSON.stringify(recent,null,2)}`}]})
-      });
-      const d=await res.json();
-      setInsight(d.error?`API error: ${d.error.message}`:(d.content?.[0]?.text||'No insight returned.'));
-    }catch(e){setInsight(`Connection error: ${e.message}`);}
-    finally{setLoadingInsight(false);}
-  };
+
 
   const openSettings=()=>{setPrevScreen(screen);setScreen('settings');};
   const saveSettings=()=>{ls.set('rbl_key',apiKey);setScreen(prevScreen);};
@@ -473,7 +444,7 @@ Give 3–5 SHORT bullet insights. Direct, cite numbers, flag anomalies vs recent
     setScreen('p1');setP1Step(0);setP2Step(0);
     setP1Date(yday());setP2Date(tday());
     setP1Data({...P1_EMPTY});setP2Data({...P2_EMPTY});
-    setP1Skipped(false);setInsight('');setP1Row('');setP2Row('');setLoadingInsight(false);
+    setP1Skipped(false);setP1Row('');setP2Row('');
   };
 
   const ProgressBar=({step,total,color,label})=>(
@@ -545,7 +516,7 @@ Give 3–5 SHORT bullet insights. Direct, cite numbers, flag anomalies vs recent
       </div>)}
 
       {screen==='results'&&<ResultsScreen p1Row={p1Row} p2Row={p2Row} p1Date={p1Date} p2Date={p2Date}
-        insight={insight} loadingInsight={loadingInsight} p1Skipped={p1Skipped} onNew={reset}/>}
+        p1Skipped={p1Skipped} onNew={reset}/>}
     </div>
   </div>);
 }
