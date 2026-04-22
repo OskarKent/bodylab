@@ -66,6 +66,19 @@ const copyText = (text,onDone) => {
   const fb=()=>{const ta=document.createElement('textarea');ta.value=text;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.focus();ta.select();document.execCommand('copy');document.body.removeChild(ta);onDone()};
   navigator.clipboard?navigator.clipboard.writeText(text).then(onDone).catch(fb):fb();
 };
+
+// JSONP — bypasses Safari CORS restrictions for cross-origin GET requests
+const jsonpFetch = (url) => new Promise((resolve, reject) => {
+  const cbName = 'blcb_' + Math.random().toString(36).slice(2);
+  const script = document.createElement('script');
+  const cleanup = () => { delete window[cbName]; script.remove(); };
+  const timer = setTimeout(() => { cleanup(); reject(new Error('Timeout')); }, 10000);
+  window[cbName] = (data) => { clearTimeout(timer); cleanup(); resolve(data); };
+  script.onerror = () => { clearTimeout(timer); cleanup(); reject(new Error('Load failed')); };
+  script.src = url + (url.includes('?')?'&':'?') + 'callback=' + cbName;
+  document.head.appendChild(script);
+});
+
 const rowValues = (entry,date) => {
   const e=entry||{};
   return [dowFull(date),shortDate(date),e.wo,e.avgPace,e.avgHR,e.totalKM,e.totalTime,e.corosLoad,e.rpe,
@@ -336,8 +349,7 @@ function ResultsScreen({p1Row,p2Row,p1Date,p2Date,p1Skipped,onNew,scriptUrl,p1En
     setStatus('loading');
     try{
       const payload=encodeURIComponent(JSON.stringify({values:rowValues(entry,date),date:shortDate(date),mode}));
-      const res=await fetch(scriptUrl+'?data='+payload);
-      const json=await res.json();
+      const json=await jsonpFetch(scriptUrl+'?data='+payload);
       if(setSyncMsg)setSyncMsg(json.message||'');
       if(json.ok){setStatus('ok');}
       else{setStatus('err');}
@@ -402,8 +414,7 @@ function SettingsScreen({apiKey,setApiKey,scriptUrl,setScriptUrl,onSave,onCancel
     if(!scriptUrl)return;
     setTesting(true);setTestResult('');
     try{
-      const res=await fetch(scriptUrl);
-      const json=await res.json();
+      const json=await jsonpFetch(scriptUrl);
       setTestResult(json.ok?'ok':'err');
     }catch(e){
       setTestResult('err');
