@@ -328,36 +328,42 @@ function P2Notes({data,setData,isOff}){
 function ResultsScreen({p1Row,p2Row,p1Date,p2Date,p1Skipped,onNew,scriptUrl,p1Entry,p2Entry}){
   const [c1,setC1]=useState(false),[c2,setC2]=useState(false);
   const [s1,setS1]=useState('idle'),[s2,setS2]=useState('idle');
+  const [msg1,setMsg1]=useState(''),[msg2,setMsg2]=useState('');
   const cp=(text,set)=>copyText(text,()=>{set(true);setTimeout(()=>set(false),2500)});
 
-  const sync=async(entry,date,mode,setStatus)=>{
+  const sync=async(entry,date,mode,setStatus,setSyncMsg)=>{
     if(!scriptUrl)return;
     setStatus('loading');
     try{
-      await fetch(scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
+      const res=await fetch(scriptUrl,{method:'POST',headers:{'Content-Type':'text/plain'},
         body:JSON.stringify({values:rowValues(entry,date),date:shortDate(date),mode})});
-      setStatus('ok');
-    }catch(e){setStatus('err');}
+      const json=await res.json();
+      if(json.ok){setStatus('ok');}
+      else{setStatus('err');if(setSyncMsg)setSyncMsg(json.message||'Unknown error');}
+    }catch(e){setStatus('err');if(setSyncMsg)setSyncMsg(e.message);}
   };
 
   const card={background:'#0a0a0a',border:'1px solid #141414',borderRadius:14,padding:20,marginBottom:14};
   const tag={fontSize:9,fontFamily:'Chakra Petch,monospace',letterSpacing:'0.16em',marginBottom:10};
 
-  const SyncRow=({onSync,onCopy,copied,syncStatus,copyLabel,syncLabel})=>(
-    <div style={{display:'flex',gap:8}}>
-      {scriptUrl&&(<button onClick={onSync} style={{flex:1,height:44,borderRadius:8,cursor:'pointer',transition:'all 0.2s',
-        background:syncStatus==='ok'?'#14532d':syncStatus==='err'?'#120808':syncStatus==='loading'?'#0a1a0a':'#0d0d0d',
-        border:`1px solid ${syncStatus==='ok'?'#166534':syncStatus==='err'?'#2a1010':'#1e1e1e'}`,
-        color:syncStatus==='ok'?'#4ade80':syncStatus==='err'?'#f87171':syncStatus==='loading'?'#555':'#aaa',
-        fontSize:12,fontFamily:'Chakra Petch',letterSpacing:'0.08em',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
-        {syncStatus==='loading'&&<div style={{width:10,height:10,border:'2px solid #4ade80',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>}
-        {syncStatus==='ok'?'✓ SYNCED':syncStatus==='err'?'✗ FAILED':syncStatus==='loading'?'SYNCING...':syncLabel}
-      </button>)}
-      <button onClick={onCopy} style={{flex:scriptUrl?0:1,height:44,padding:scriptUrl?'0 14px':'0',minWidth:scriptUrl?80:0,borderRadius:8,cursor:'pointer',transition:'all 0.2s',
-        background:copied?'#14532d':'#0d0d0d',border:`1px solid ${copied?'#166534':'#1e1e1e'}`,
-        color:copied?'#4ade80':'#555',fontSize:11,fontFamily:'Chakra Petch',letterSpacing:'0.06em',whiteSpace:'nowrap'}}>
-        {copied?'✓':copyLabel}
-      </button>
+  const SyncRow=({onSync,onCopy,copied,syncStatus,copyLabel,syncLabel,errMsg})=>(
+    <div>
+      <div style={{display:'flex',gap:8}}>
+        {scriptUrl&&(<button onClick={onSync} style={{flex:1,height:44,borderRadius:8,cursor:'pointer',transition:'all 0.2s',
+          background:syncStatus==='ok'?'#14532d':syncStatus==='err'?'#120808':syncStatus==='loading'?'#0a1a0a':'#0d0d0d',
+          border:`1px solid ${syncStatus==='ok'?'#166534':syncStatus==='err'?'#2a1010':'#1e1e1e'}`,
+          color:syncStatus==='ok'?'#4ade80':syncStatus==='err'?'#f87171':syncStatus==='loading'?'#555':'#aaa',
+          fontSize:12,fontFamily:'Chakra Petch',letterSpacing:'0.08em',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+          {syncStatus==='loading'&&<div style={{width:10,height:10,border:'2px solid #4ade80',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>}
+          {syncStatus==='ok'?'✓ SYNCED':syncStatus==='err'?'✗ FAILED':syncStatus==='loading'?'SYNCING...':syncLabel}
+        </button>)}
+        <button onClick={onCopy} style={{flex:scriptUrl?0:1,height:44,padding:scriptUrl?'0 14px':'0',minWidth:scriptUrl?80:0,borderRadius:8,cursor:'pointer',transition:'all 0.2s',
+          background:copied?'#14532d':'#0d0d0d',border:`1px solid ${copied?'#166534':'#1e1e1e'}`,
+          color:copied?'#4ade80':'#555',fontSize:11,fontFamily:'Chakra Petch',letterSpacing:'0.06em',whiteSpace:'nowrap'}}>
+          {copied?'✓':copyLabel}
+        </button>
+      </div>
+      {syncStatus==='err'&&errMsg&&<div style={{fontSize:10,color:'#f87171',marginTop:6,lineHeight:1.5}}>{errMsg}</div>}
     </div>
   );
 
@@ -368,15 +374,15 @@ function ResultsScreen({p1Row,p2Row,p1Date,p2Date,p1Skipped,onNew,scriptUrl,p1En
     {!p1Skipped&&p1Row&&(<div style={card}>
       <div style={{...tag,color:'#bbb'}}>CLOSE OUT — {fmtDate(p1Date).toUpperCase()}</div>
       <div style={{fontSize:11,color:'#999',marginBottom:12}}>Updates {fmtDate(p1Date)} row with sleep, HRV &amp; nutrition</div>
-      <SyncRow onSync={()=>sync(p1Entry,p1Date,'update',setS1)} onCopy={()=>cp(p1Row,setC1)}
-        copied={c1} syncStatus={s1} copyLabel="COPY CSV" syncLabel="↑ SYNC TO SHEET"/>
+      <SyncRow onSync={()=>sync(p1Entry,p1Date,'update',setS1,setMsg1)} onCopy={()=>cp(p1Row,setC1)}
+        copied={c1} syncStatus={s1} copyLabel="COPY CSV" syncLabel="↑ SYNC TO SHEET" errMsg={msg1}/>
     </div>)}
 
     <div style={card}>
       <div style={{...tag,color:'#ff6b2b'}}>TODAY — {fmtDate(p2Date).toUpperCase()}</div>
       <div style={{fontSize:11,color:'#999',marginBottom:12}}>Adds new row for today's session</div>
-      <SyncRow onSync={()=>sync(p2Entry,p2Date,'append',setS2)} onCopy={()=>cp(p2Row,setC2)}
-        copied={c2} syncStatus={s2} copyLabel="COPY CSV" syncLabel="↑ SYNC TO SHEET"/>
+      <SyncRow onSync={()=>sync(p2Entry,p2Date,'append',setS2,setMsg2)} onCopy={()=>cp(p2Row,setC2)}
+        copied={c2} syncStatus={s2} copyLabel="COPY CSV" syncLabel="↑ SYNC TO SHEET" errMsg={msg2}/>
     </div>
 
     {!scriptUrl&&<div style={{fontSize:11,color:'#444',textAlign:'center',marginTop:-6,marginBottom:14,fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>Add Script URL in ⚙ to enable direct sync</div>}
@@ -394,8 +400,9 @@ function SettingsScreen({apiKey,setApiKey,scriptUrl,setScriptUrl,onSave,onCancel
     if(!scriptUrl)return;
     setTesting(true);setTestResult('');
     try{
-      const res=await fetch(scriptUrl,{method:'GET',mode:'no-cors'});
-      setTestResult('ok');
+      const res=await fetch(scriptUrl,{method:'GET'});
+      const json=await res.json();
+      setTestResult(json.ok?'ok':'err');
     }catch(e){
       setTestResult('err');
     }finally{setTesting(false);}
