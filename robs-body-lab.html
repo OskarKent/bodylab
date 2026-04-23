@@ -40,10 +40,10 @@ const WO_TYPES = [
   {id:'EASY',label:'Easy',sub:'Run'},{id:'OFF',label:'Off',sub:'Rest'},
   {id:'RACE',label:'Race',sub:''},{id:'OTHER',label:'Other',sub:''},
 ];
-const P1_EMPTY = {sleepScore:'',sleepHours:'',rhr:'',hrv:'',cals:'',protein:'',carbs:'',weight:''};
+const P1_EMPTY = {sleepScore:'',sleepHours:'',rhr:'',hrv:'',cals:'',protein:'',carbs:'',weight:'',mood:'',jumpHeight:'',physicalIssues:''};
 const P2_EMPTY = {wo:'',avgPace:'',avgHR:'',totalKM:'',totalTime:'',corosLoad:'',rpe:'',
   preCarbs:'',caffeine:'',kBicarb:'',inCarbs:'',runningExtras:'',runningExtrasLoad:'',
-  ubSets:'',lbSets:'',mood:'',physicalIssues:'',jumpHeight:'',weather:'',trainingNotes:'',stress:''};
+  ubSets:'',lbSets:'',weather:'',trainingNotes:'',stress:''};
 
 // ── utilities ──────────────────────────────────────────────────────────────────
 const dk = (d) => { const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; };
@@ -242,6 +242,17 @@ function P1Sleep({data,setData,apiKey}){
     <F label="HRV"><Num value={data.hrv} onChange={v=>upd({hrv:v})} min={0} max={120}/></F>
   </div>);
 }
+
+function P1Morning({data,setData}){
+  const set=(k,v)=>setData(p=>({...p,[k]:v}));
+  return(<div>
+    <F label="Morning Mood / Energy"><Pills options={['1/5','2/5','3/5','4/5','5/5']} value={data.mood} onChange={v=>set('mood',v)}/></F>
+    <F label="Jump Height (cm)" hint="Doorframe test — note deviation from your baseline">
+      <Num value={data.jumpHeight} onChange={v=>set('jumpHeight',v)} min={0} max={80} step={0.5}/>
+    </F>
+    <F label="Physical Issues"><Txt value={data.physicalIssues} onChange={v=>set('physicalIssues',v)} placeholder="Rib, adductor, back..."/></F>
+  </div>);
+}
 function P1Weight({data,setData}){
   return(<F label="Morning Weight (kg)" hint="First thing — before eating or drinking">
     <Num value={data.weight} onChange={v=>setData(p=>({...p,weight:v}))} min={60} max={130} step={0.05}/>
@@ -338,7 +349,7 @@ function P2Notes({data,setData,isOff}){
 }
 
 // ── Results ────────────────────────────────────────────────────────────────────
-function ResultsScreen({p1Row,p2Date,p1Skipped,onNew,scriptUrl,p1Entry,p1Date,onSynced}){
+function ResultsScreen({p1Row,p2Date,p1Skipped,onNew,scriptUrl,p1Entry,p1Date,onSynced,goToP2}){
   const [syncStatus,setSyncStatus]=useState('idle');
   const [copied,setCopied]=useState(false);
   const cp=()=>copyText(p1Row,()=>{setCopied(true);setTimeout(()=>setCopied(false),2500)});
@@ -393,7 +404,9 @@ function ResultsScreen({p1Row,p2Date,p1Skipped,onNew,scriptUrl,p1Entry,p1Date,on
 
     {!scriptUrl&&!p1Skipped&&p1Row&&<div style={{fontSize:11,color:'#444',textAlign:'center',marginTop:-6,marginBottom:14,fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>Add Script URL in ⚙ to enable direct sync</div>}
 
-    <button onClick={onNew} style={{width:'100%',height:50,background:'#090909',border:'1px solid #121212',borderRadius:12,color:'#888',fontSize:12,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',marginTop:4}}>+ NEW ENTRY</button>
+    {goToP2&&<button onClick={goToP2} style={{width:'100%',height:52,background:'#ff6b2b',border:'none',borderRadius:12,color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.06em',marginTop:4}}>LOG TODAY'S SESSION →</button>}
+
+    <button onClick={onNew} style={{width:'100%',height:50,background:'#090909',border:'1px solid #121212',borderRadius:12,color:'#888',fontSize:12,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',marginTop:10}}>+ NEW ENTRY</button>
   </div>);
 }
 
@@ -471,19 +484,21 @@ function App(){
 
   useEffect(()=>{
     const e=allEntries[dk(p1Date)]||{};
-    setP1Data({sleepScore:e.sleepScore||'',sleepHours:e.sleepHours||'',rhr:e.rhr||'',hrv:e.hrv||'',cals:e.cals||'',protein:e.protein||'',carbs:e.carbs||'',weight:e.weight||''});
+    const todayE=allEntries[dk(p2Date)]||{};
+    setP1Data({sleepScore:e.sleepScore||'',sleepHours:e.sleepHours||'',rhr:e.rhr||'',hrv:e.hrv||'',cals:e.cals||'',protein:e.protein||'',carbs:e.carbs||'',weight:e.weight||'',
+      mood:todayE.mood||'',jumpHeight:todayE.jumpHeight||'',physicalIssues:todayE.physicalIssues||''});
   },[p1Date]); // eslint-disable-line
 
   useEffect(()=>{
     const e=allEntries[dk(p2Date)]||{};
-    if(e.wo)setP2Data({wo:e.wo||'',avgPace:e.avgPace||'',avgHR:e.avgHR||'',totalKM:e.totalKM||'',totalTime:e.totalTime||'',corosLoad:e.corosLoad||'',rpe:e.rpe||'',preCarbs:e.preCarbs||'',caffeine:e.caffeine||'',kBicarb:e.kBicarb||'',inCarbs:e.inCarbs||'',runningExtras:e.runningExtras||'',runningExtrasLoad:e.runningExtrasLoad||'',ubSets:e.ubSets||'',lbSets:e.lbSets||'',mood:e.mood||'',physicalIssues:e.physicalIssues||'',jumpHeight:e.jumpHeight||'',weather:e.weather||'',trainingNotes:e.trainingNotes||'',stress:e.stress||''});
+    if(e.wo)setP2Data({wo:e.wo||'',avgPace:e.avgPace||'',avgHR:e.avgHR||'',totalKM:e.totalKM||'',totalTime:e.totalTime||'',corosLoad:e.corosLoad||'',rpe:e.rpe||'',preCarbs:e.preCarbs||'',caffeine:e.caffeine||'',kBicarb:e.kBicarb||'',inCarbs:e.inCarbs||'',runningExtras:e.runningExtras||'',runningExtrasLoad:e.runningExtrasLoad||'',ubSets:e.ubSets||'',lbSets:e.lbSets||'',weather:e.weather||'',trainingNotes:e.trainingNotes||'',stress:e.stress||''});
   },[p2Date]); // eslint-disable-line
 
   const isOff=p2Data.wo==='OFF';
   const isSubT=SUB_T.includes(p2Data.wo);
-  const P1_STEPS=['sleep','weight','nutrition'];
+  const P1_STEPS=['sleep','morning','weight','nutrition'];
   const p1IsLast=p1Step===P1_STEPS.length-1;
-  const p2Steps=isOff?['type','notes']:['type','presession','fuel','session','postsession','notes'];
+  const p2Steps=isOff?['type','notes']:['type','fuel','session','postsession','notes'];
   const p2IsLast=p2Step===p2Steps.length-1;
   const p2CanNext=p2Step===0?p2Data.wo!=='':true;
 
@@ -496,9 +511,14 @@ function App(){
   };
 
   const finishP1=()=>{
-    const merged=saveAndMerge(dk(p1Date),p1Data);
+    // Save sleep/nutrition/weight to yesterday's entry
+    const {mood,jumpHeight,physicalIssues,...sleepNutrition}=p1Data;
+    const merged=saveAndMerge(dk(p1Date),sleepNutrition);
     setP1Entry(merged);
-    setP1Row(formatRow(merged,p1Date));setScreen('p2');
+    setP1Row(formatRow(merged,p1Date));
+    // Save this morning's readiness to today's entry
+    saveAndMerge(dk(p2Date),{mood,jumpHeight,physicalIssues});
+    setScreen('results');
   };
   const skipP1=()=>{setP1Skipped(true);setScreen('p2');};
 
@@ -567,7 +587,7 @@ function App(){
       </div>
       <div style={{display:'flex',gap:14,alignItems:'center'}}>
         {screen==='p1'&&<button onClick={skipP1} style={{background:'none',border:'1px solid #333',borderRadius:6,color:'#999',fontSize:10,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',padding:'6px 10px',lineHeight:1}}>SKIP →</button>}
-        {screen==='results'&&<button onClick={reset} style={{background:'none',border:'none',color:'#888',fontSize:11,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.1em',padding:0}}>+ NEW</button>}
+        {(screen==='results'||screen==='p2')&&<button onClick={reset} style={{background:'none',border:'none',color:'#888',fontSize:11,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.1em',padding:0}}>+ NEW</button>}
         <button onClick={screen==='settings'?cancelSettings:openSettings}
           style={{background:'none',border:'none',color:screen==='settings'?'#ff6b2b':'#777',fontSize:19,cursor:'pointer',lineHeight:1,padding:0}}>⚙</button>
       </div>
@@ -582,17 +602,17 @@ function App(){
         {syncedDates.has(dk(p1Date))&&<div style={{background:'#091209',border:'1px solid #163016',borderRadius:8,padding:'10px 14px',marginTop:-16,marginBottom:20,fontSize:11,color:'#4ade80',fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>✓ Already synced — pick a different date or skip</div>}
         <ProgressBar step={p1Step} total={P1_STEPS.length} color="#666" label={P1_STEPS[p1Step].toUpperCase()}/>
         {p1Step===0&&<P1Sleep data={p1Data} setData={setP1Data} apiKey={apiKey}/>}
-        {p1Step===1&&<P1Weight data={p1Data} setData={setP1Data}/>}
-        {p1Step===2&&<P1Nutrition data={p1Data} setData={setP1Data} apiKey={apiKey}/>}
+        {p1Step===1&&<P1Morning data={p1Data} setData={setP1Data}/>}
+        {p1Step===2&&<P1Weight data={p1Data} setData={setP1Data}/>}
+        {p1Step===3&&<P1Nutrition data={p1Data} setData={setP1Data} apiKey={apiKey}/>}
         <NavRow step={p1Step} setStep={setP1Step} isLast={p1IsLast} canNext={true} onFinish={finishP1} finishLabel="DONE → LOG TODAY" accent="#666"/>
       </div>)}
 
       {screen==='p2'&&(<div>
         <DatePicker date={p2Date} onChange={setP2Date} label="LOGGING FOR"/>
         <ProgressBar step={p2Step} total={p2Steps.length} color="#ff6b2b"
-          label={p2Steps[p2Step].replace('presession','PRE-SESSION').replace('postsession','POST-SESSION').toUpperCase()}/>
+          label={p2Steps[p2Step].replace('postsession','POST-SESSION').toUpperCase()}/>
         {p2Steps[p2Step]==='type'&&<P2Type data={p2Data} setData={setP2Data}/>}
-        {p2Steps[p2Step]==='presession'&&<P2PreSession data={p2Data} setData={setP2Data}/>}
         {p2Steps[p2Step]==='fuel'&&<P2Fuel data={p2Data} setData={setP2Data}/>}
         {p2Steps[p2Step]==='session'&&<P2Session data={p2Data} setData={setP2Data} isSubT={isSubT} apiKey={apiKey}/>}
         {p2Steps[p2Step]==='postsession'&&<P2PostSession data={p2Data} setData={setP2Data}/>}
@@ -607,7 +627,8 @@ function App(){
           const updated=[...new Set([...existing,dk(p1Date)])];
           ls.set('rbl_synced',updated);
           setSyncedDates(new Set(updated));
-        }}/>}
+        }}
+        goToP2={!p1Skipped?()=>{setP2Step(0);setScreen('p2');}:null}/>}
     </div>
   </div>);
 }
