@@ -40,9 +40,9 @@ const WO_TYPES = [
   {id:'EASY',label:'Easy',sub:'Run'},{id:'OFF',label:'Off',sub:'Rest'},
   {id:'RACE',label:'Race',sub:''},{id:'OTHER',label:'Other',sub:''},
 ];
-const P1_EMPTY = {sleepScore:'',sleepHours:'',rhr:'',hrv:'',cals:'',protein:'',carbs:'',weight:'',mood:'',jumpHeight:'',physicalIssues:''};
+const P1_EMPTY = {sleepScore:'',sleepHours:'',rhr:'',hrv:'',cals:'',protein:'',carbs:'',weight:'',mood:'',jumpHeight:'',physicalIssues:'',preCarbs:'',caffeine:'',kBicarb:''};
 const P2_EMPTY = {wo:'',avgPace:'',avgHR:'',totalKM:'',totalTime:'',corosLoad:'',rpe:'',
-  preCarbs:'',caffeine:'',kBicarb:'',inCarbs:'',runningExtras:'',runningExtrasLoad:'',
+  inCarbs:'',runningExtras:'',runningExtrasLoad:'',
   ubSets:'',lbSets:'',weather:'',trainingNotes:'',stress:''};
 
 // ── utilities ──────────────────────────────────────────────────────────────────
@@ -81,10 +81,21 @@ const jsonpFetch = (url) => new Promise((resolve, reject) => {
 
 const rowValues = (entry,date) => {
   const e=entry||{};
-  return [dowFull(date),shortDate(date),e.wo,e.avgPace,e.avgHR,e.totalKM,e.totalTime,e.corosLoad,e.rpe,
-    e.preCarbs,e.inCarbs,e.caffeine,e.kBicarb,e.mood,e.weather,e.trainingNotes,
-    e.runningExtras,e.runningExtrasLoad,e.ubSets,e.lbSets,e.stress,e.physicalIssues,e.jumpHeight,
-    e.sleepHours,e.sleepScore,e.rhr,e.hrv,e.cals,e.protein,e.carbs,e.weight,'',
+  return [
+    dowFull(date), shortDate(date),
+    // Recovery inputs
+    e.sleepHours, e.sleepScore, e.rhr, e.hrv, e.weight,
+    e.cals, e.protein, e.carbs,
+    // Morning readiness
+    e.mood, e.jumpHeight, e.physicalIssues,
+    // Pre-session fuel
+    e.preCarbs, e.caffeine, e.kBicarb,
+    // Session output
+    e.wo, e.avgPace, e.avgHR, e.totalKM, e.totalTime, e.corosLoad, e.rpe,
+    // In-session & extras
+    e.inCarbs, e.runningExtras, e.runningExtrasLoad, e.ubSets, e.lbSets,
+    // Context
+    e.weather, e.trainingNotes, e.stress, '',
   ].map(v=>v==null?'':String(v));
 };
 const formatRow = (entry,date) => rowValues(entry,date).join(',');
@@ -251,6 +262,13 @@ function P1Morning({data,setData}){
       <Num value={data.jumpHeight} onChange={v=>set('jumpHeight',v)} min={0} max={80} step={0.5}/>
     </F>
     <F label="Physical Issues"><Txt value={data.physicalIssues} onChange={v=>set('physicalIssues',v)} placeholder="Rib, adductor, back..."/></F>
+    <Divider/>
+    <F label="Pre-Session Carbs (g)"><Num value={data.preCarbs} onChange={v=>set('preCarbs',v)} min={0} max={300} step={5}/></F>
+    <F label="Caffeine (mg)" hint="1 home aeropress ≈ 100mg">
+      <div style={{marginBottom:8}}><Pills options={[0,100,200,300]} value={data.caffeine} onChange={v=>set('caffeine',v)}/></div>
+      <Num value={data.caffeine} onChange={v=>set('caffeine',v)} min={0} max={600} step={25}/>
+    </F>
+    <F label="K-Bicarb (g)"><Num value={data.kBicarb} onChange={v=>set('kBicarb',v)} min={0} max={30} step={0.5}/></F>
   </div>);
 }
 function P1Weight({data,setData}){
@@ -484,21 +502,21 @@ function App(){
 
   useEffect(()=>{
     const e=allEntries[dk(p1Date)]||{};
-    const todayE=allEntries[dk(p2Date)]||{};
     setP1Data({sleepScore:e.sleepScore||'',sleepHours:e.sleepHours||'',rhr:e.rhr||'',hrv:e.hrv||'',cals:e.cals||'',protein:e.protein||'',carbs:e.carbs||'',weight:e.weight||'',
-      mood:todayE.mood||'',jumpHeight:todayE.jumpHeight||'',physicalIssues:todayE.physicalIssues||''});
+      mood:e.mood||'',jumpHeight:e.jumpHeight||'',physicalIssues:e.physicalIssues||'',
+      preCarbs:e.preCarbs||'',caffeine:e.caffeine||'',kBicarb:e.kBicarb||''});
   },[p1Date]); // eslint-disable-line
 
   useEffect(()=>{
     const e=allEntries[dk(p2Date)]||{};
-    if(e.wo)setP2Data({wo:e.wo||'',avgPace:e.avgPace||'',avgHR:e.avgHR||'',totalKM:e.totalKM||'',totalTime:e.totalTime||'',corosLoad:e.corosLoad||'',rpe:e.rpe||'',preCarbs:e.preCarbs||'',caffeine:e.caffeine||'',kBicarb:e.kBicarb||'',inCarbs:e.inCarbs||'',runningExtras:e.runningExtras||'',runningExtrasLoad:e.runningExtrasLoad||'',ubSets:e.ubSets||'',lbSets:e.lbSets||'',weather:e.weather||'',trainingNotes:e.trainingNotes||'',stress:e.stress||''});
+    if(e.wo)setP2Data({wo:e.wo||'',avgPace:e.avgPace||'',avgHR:e.avgHR||'',totalKM:e.totalKM||'',totalTime:e.totalTime||'',corosLoad:e.corosLoad||'',rpe:e.rpe||'',inCarbs:e.inCarbs||'',runningExtras:e.runningExtras||'',runningExtrasLoad:e.runningExtrasLoad||'',ubSets:e.ubSets||'',lbSets:e.lbSets||'',weather:e.weather||'',trainingNotes:e.trainingNotes||'',stress:e.stress||''});
   },[p2Date]); // eslint-disable-line
 
   const isOff=p2Data.wo==='OFF';
   const isSubT=SUB_T.includes(p2Data.wo);
   const P1_STEPS=['sleep','morning','weight','nutrition'];
   const p1IsLast=p1Step===P1_STEPS.length-1;
-  const p2Steps=isOff?['type','notes']:['type','fuel','session','postsession','notes'];
+  const p2Steps=isOff?['type','notes']:['type','session','postsession','notes'];
   const p2IsLast=p2Step===p2Steps.length-1;
   const p2CanNext=p2Step===0?p2Data.wo!=='':true;
 
@@ -511,13 +529,11 @@ function App(){
   };
 
   const finishP1=()=>{
-    // Save sleep/nutrition/weight to yesterday's entry
-    const {mood,jumpHeight,physicalIssues,...sleepNutrition}=p1Data;
-    const merged=saveAndMerge(dk(p1Date),sleepNutrition);
+    // Save everything from Phase 1 into yesterday's row (the one being synced)
+    // Jump height, mood, and physical issues this morning all reflect yesterday's recovery
+    const merged=saveAndMerge(dk(p1Date),p1Data);
     setP1Entry(merged);
     setP1Row(formatRow(merged,p1Date));
-    // Save this morning's readiness to today's entry
-    saveAndMerge(dk(p2Date),{mood,jumpHeight,physicalIssues});
     setScreen('results');
   };
   const skipP1=()=>{setP1Skipped(true);setScreen('p2');};
@@ -613,7 +629,6 @@ function App(){
         <ProgressBar step={p2Step} total={p2Steps.length} color="#ff6b2b"
           label={p2Steps[p2Step].replace('postsession','POST-SESSION').toUpperCase()}/>
         {p2Steps[p2Step]==='type'&&<P2Type data={p2Data} setData={setP2Data}/>}
-        {p2Steps[p2Step]==='fuel'&&<P2Fuel data={p2Data} setData={setP2Data}/>}
         {p2Steps[p2Step]==='session'&&<P2Session data={p2Data} setData={setP2Data} isSubT={isSubT} apiKey={apiKey}/>}
         {p2Steps[p2Step]==='postsession'&&<P2PostSession data={p2Data} setData={setP2Data}/>}
         {p2Steps[p2Step]==='notes'&&<P2Notes data={p2Data} setData={setP2Data} isOff={isOff}/>}
