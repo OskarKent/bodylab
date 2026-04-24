@@ -416,13 +416,13 @@ function ResultsScreen({p1Row,p2Date,p1Skipped,onNew,scriptUrl,p1Entry,p1Date,on
     {/* Today's session — saved locally, syncs tomorrow after close-out */}
     <div style={card}>
       <div style={{...tag,color:'#ff6b2b'}}>TODAY — {fmtDate(p2Date).toUpperCase()}</div>
-      <div style={{fontSize:13,color:'#888',lineHeight:1.7}}>Session saved locally.</div>
-      <div style={{fontSize:11,color:'#555',marginTop:4}}>Tomorrow morning, complete Phase 1 to add sleep &amp; nutrition — then the full row syncs to your sheet.</div>
+      <div style={{fontSize:13,color:'#888',lineHeight:1.7}}>Session saved.</div>
+      <div style={{fontSize:11,color:'#555',marginTop:4}}>Tomorrow morning, complete the Morning phase to add sleep &amp; nutrition — then the full row syncs to your sheet.</div>
     </div>
 
     {!scriptUrl&&!p1Skipped&&p1Row&&<div style={{fontSize:11,color:'#444',textAlign:'center',marginTop:-6,marginBottom:14,fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>Add Script URL in ⚙ to enable direct sync</div>}
 
-    {goToP2&&<button onClick={goToP2} style={{width:'100%',height:52,background:'#ff6b2b',border:'none',borderRadius:12,color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.06em',marginTop:4}}>LOG TODAY'S SESSION →</button>}
+    {goToP2&&<button onClick={goToP2} style={{width:'100%',height:52,background:'#ff6b2b',border:'none',borderRadius:12,color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.06em',marginTop:4}}>LOG SESSION →</button>}
 
     <button onClick={onNew} style={{width:'100%',height:50,background:'#090909',border:'1px solid #121212',borderRadius:12,color:'#888',fontSize:12,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',marginTop:10}}>+ NEW ENTRY</button>
   </div>);
@@ -598,11 +598,11 @@ function App(){
     <div style={{padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid #0e0e0e',position:'sticky',top:0,background:'#080808',zIndex:10}}>
       <div>
         <div style={{fontSize:11,fontFamily:'Chakra Petch',letterSpacing:'0.18em',color:'#ff6b2b'}}>ROB'S BODY LAB</div>
-        {screen==='p1'&&<div style={{fontSize:8,color:'#777',fontFamily:'Chakra Petch',letterSpacing:'0.12em',marginTop:2}}>PHASE 1: CLOSE OUT</div>}
-        {screen==='p2'&&<div style={{fontSize:8,color:'#777',fontFamily:'Chakra Petch',letterSpacing:'0.12em',marginTop:2}}>PHASE 2: LOG TODAY</div>}
+        {screen==='p1'&&<div style={{fontSize:8,color:'#777',fontFamily:'Chakra Petch',letterSpacing:'0.12em',marginTop:2}}>MORNING</div>}
+        {screen==='p2'&&<div style={{fontSize:8,color:'#777',fontFamily:'Chakra Petch',letterSpacing:'0.12em',marginTop:2}}>SESSION</div>}
       </div>
       <div style={{display:'flex',gap:14,alignItems:'center'}}>
-        {screen==='p1'&&<button onClick={skipP1} style={{background:'none',border:'1px solid #333',borderRadius:6,color:'#999',fontSize:10,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',padding:'6px 10px',lineHeight:1}}>SKIP →</button>}
+        {screen==='p1'&&<button onClick={skipP1} style={{background:'none',border:'1px solid #333',borderRadius:6,color:'#999',fontSize:10,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',padding:'6px 10px',lineHeight:1}}>SKIP MORNING →</button>}
         {(screen==='results'||screen==='p2')&&<button onClick={reset} style={{background:'none',border:'none',color:'#888',fontSize:11,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.1em',padding:0}}>+ NEW</button>}
         <button onClick={screen==='settings'?cancelSettings:openSettings}
           style={{background:'none',border:'none',color:screen==='settings'?'#ff6b2b':'#777',fontSize:19,cursor:'pointer',lineHeight:1,padding:0}}>⚙</button>
@@ -614,18 +614,18 @@ function App(){
       {screen==='settings'&&<SettingsScreen apiKey={apiKey} setApiKey={setApiKey} scriptUrl={scriptUrl} setScriptUrl={setScriptUrl} onSave={saveSettings} onCancel={cancelSettings}/>}
 
       {screen==='p1'&&(<div>
-        <DatePicker date={p1Date} onChange={setP1Date} label="CLOSING OUT"/>
+        <DatePicker date={p1Date} onChange={setP1Date} label="MORNING OF"/>
         {syncedDates.has(dk(p1Date))&&<div style={{background:'#091209',border:'1px solid #163016',borderRadius:8,padding:'10px 14px',marginTop:-16,marginBottom:20,fontSize:11,color:'#4ade80',fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>✓ Already synced — pick a different date or skip</div>}
         <ProgressBar step={p1Step} total={P1_STEPS.length} color="#666" label={P1_STEPS[p1Step].toUpperCase()}/>
         {p1Step===0&&<P1Sleep data={p1Data} setData={setP1Data} apiKey={apiKey}/>}
         {p1Step===1&&<P1Morning data={p1Data} setData={setP1Data}/>}
         {p1Step===2&&<P1Weight data={p1Data} setData={setP1Data}/>}
         {p1Step===3&&<P1Nutrition data={p1Data} setData={setP1Data} apiKey={apiKey}/>}
-        <NavRow step={p1Step} setStep={setP1Step} isLast={p1IsLast} canNext={true} onFinish={finishP1} finishLabel="DONE → LOG TODAY" accent="#666"/>
+        <NavRow step={p1Step} setStep={setP1Step} isLast={p1IsLast} canNext={true} onFinish={finishP1} finishLabel="SYNC & CONTINUE →" accent="#666"/>
       </div>)}
 
       {screen==='p2'&&(<div>
-        <DatePicker date={p2Date} onChange={setP2Date} label="LOGGING FOR"/>
+        <DatePicker date={p2Date} onChange={setP2Date} label="SESSION DATE"/>
         <ProgressBar step={p2Step} total={p2Steps.length} color="#ff6b2b"
           label={p2Steps[p2Step].replace('postsession','POST-SESSION').toUpperCase()}/>
         {p2Steps[p2Step]==='type'&&<P2Type data={p2Data} setData={setP2Data}/>}
