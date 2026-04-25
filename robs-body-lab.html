@@ -367,7 +367,7 @@ function P2Notes({data,setData,isOff}){
 }
 
 // ── Results ────────────────────────────────────────────────────────────────────
-function ResultsScreen({p1Row,p2Date,p1Skipped,onNew,scriptUrl,p1Entry,p1Date,onSynced,goToP2}){
+function ResultsScreen({p1Row,p2Date,p1Skipped,onNew,scriptUrl,p1Entry,p1Date,onSynced,goToP2,macros,macrosLoading}){
   const [syncStatus,setSyncStatus]=useState('idle');
   const [copied,setCopied]=useState(false);
   const cp=()=>copyText(p1Row,()=>{setCopied(true);setTimeout(()=>setCopied(false),2500)});
@@ -419,6 +419,27 @@ function ResultsScreen({p1Row,p2Date,p1Skipped,onNew,scriptUrl,p1Entry,p1Date,on
       <div style={{fontSize:13,color:'#888',lineHeight:1.7}}>Session saved.</div>
       <div style={{fontSize:11,color:'#555',marginTop:4}}>Tomorrow morning, complete the Morning phase to add sleep &amp; nutrition — then the full row syncs to your sheet.</div>
     </div>
+
+    {/* Macro prescription */}
+    {(macrosLoading||macros)&&(<div style={{...card,borderColor:macros&&!macros.error?'#1a2a1a':'#141414'}}>
+      <div style={{...tag,color:'#4ade80'}}>TODAY'S TARGETS</div>
+      {macrosLoading&&<div style={{display:'flex',alignItems:'center',gap:12,padding:'6px 0'}}>
+        <div style={{width:12,height:12,border:'2px solid #4ade80',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.7s linear infinite',flexShrink:0}}/>
+        <span style={{fontSize:11,fontFamily:'Chakra Petch',color:'#555',letterSpacing:'0.1em'}}>CALCULATING...</span>
+      </div>}
+      {macros&&!macros.error&&(<div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginBottom:14}}>
+          {[['KCAL',macros.cals,''],['PROTEIN',macros.protein,'g'],['CARBS',macros.carbs,'g']].map(([label,val,unit])=>(
+            <div key={label} style={{background:'#060606',borderRadius:8,padding:'10px 8px',textAlign:'center'}}>
+              <div style={{fontSize:9,color:'#555',fontFamily:'Chakra Petch',letterSpacing:'0.1em',marginBottom:4}}>{label}</div>
+              <div style={{fontSize:20,color:'#e0e0e0',fontFamily:'Chakra Petch',fontWeight:700}}>{val}<span style={{fontSize:11,color:'#555'}}>{unit}</span></div>
+            </div>
+          ))}
+        </div>
+        {macros.rationale&&<div style={{fontSize:12,color:'#777',lineHeight:1.7,fontStyle:'italic'}}>{macros.rationale}</div>}
+      </div>)}
+      {macros&&macros.error&&<div style={{fontSize:11,color:'#f87171'}}>{macros.error}</div>}
+    </div>)}
 
     {!scriptUrl&&!p1Skipped&&p1Row&&<div style={{fontSize:11,color:'#444',textAlign:'center',marginTop:-6,marginBottom:14,fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>Add Script URL in ⚙ to enable direct sync</div>}
 
@@ -482,6 +503,8 @@ function App(){
   const [p2Entry,setP2Entry]=useState({});
   const [syncedDates,setSyncedDates]=useState(new Set());
   const [p1Row,setP1Row]=useState('');
+  const [macros,setMacros]=useState(null);
+  const [macrosLoading,setMacrosLoading]=useState(false);
   const [p2Row,setP2Row]=useState('');
 
   useEffect(()=>{
@@ -531,7 +554,9 @@ function App(){
   const finishP1=()=>{
     // Save everything from Phase 1 into yesterday's row (the one being synced)
     // Jump height, mood, and physical issues this morning all reflect yesterday's recovery
-    const merged=saveAndMerge(dk(p1Date),p1Data);
+    const existing=allEntries[dk(p1Date)]||{};
+    const entry={...p1Data,...(!existing.wo?{wo:'OFF'}:{})};
+    const merged=saveAndMerge(dk(p1Date),entry);
     setP1Entry(merged);
     setP1Row(formatRow(merged,p1Date));
     setScreen('results');
@@ -541,6 +566,66 @@ function App(){
   const finishP2=async()=>{
     saveAndMerge(dk(p2Date),p2Data);
     setScreen('results');
+    if(apiKey&&scriptUrl){
+      setMacrosLoading(true);
+      fetchMacros(p2Data,p1Entry);
+    }
+  };
+
+  const fetchMacros=async(sessionData,morningData)=>{
+    try{
+      // Fetch last 30 rows from sheet
+      let sheetRows=[];
+      if(scriptUrl){
+        try{
+          const res=await jsonpFetch(scriptUrl+'?action=read&n=30');
+          if(res.ok&&res.rows)sheetRows=res.rows;
+        }catch(e){console.log('Sheet read failed',e);}
+      }
+
+      const context={
+        session:sessionData,
+        morning:morningData,
+        history:sheetRows,
+        profile:{
+          weight:morningData.weight||83,
+          targetWeeklyKM:80,
+          method:'Norwegian Singles',
+          proteinTarget:'185-200g/day',
+          maintenanceEstimate:3080
+        }
+      };
+
+      const res=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body:JSON.stringify({
+          model:'claude-sonnet-4-6',
+          max_tokens:600,
+          system:`You are a sports nutritionist for Rob, male, born Feb 1977, ~83kg, serious endurance runner.
+Training: Norwegian Singles Method ~80km/week, 3 subT sessions/week (10×3:00, 5×6:00, 3×10:00).
+Estimated maintenance: ~3,080 kcal. Protein target: 185-200g/day.
+Goal: modest fat loss while maintaining training quality.
+
+Analyse today's session quality (pace, HR, RPE, load) and this morning's recovery (HRV, sleep, jump height, mood) against recent history to prescribe today's macros.
+
+Go beyond session type — consider actual execution quality. A subT session at RPE 9 HR 175 needs more fuel than the same session at RPE 6 HR 158.
+
+Return ONLY valid JSON, no markdown:
+{"cals":3600,"protein":195,"carbs":480,"rationale":"2-3 sentence explanation citing specific numbers from today"}`,
+          messages:[{role:'user',content:JSON.stringify(context)}]
+        })
+      });
+      const d=await res.json();
+      if(d.error)throw new Error(d.error.message);
+      const text=d.content?.[0]?.text||'{}';
+      const parsed=JSON.parse(text.replace(/\`\`\`[\w]*/g,'').replace(/\`\`\`/g,'').trim());
+      setMacros(parsed);
+    }catch(e){
+      setMacros({error:e.message});
+    }finally{
+      setMacrosLoading(false);
+    }
   };
 
 
@@ -564,7 +649,7 @@ function App(){
     setScreen('p1');setP1Step(0);setP2Step(0);
     setP1Date(bestP1Date());setP2Date(tday());
     setP1Data({...P1_EMPTY});setP2Data({...P2_EMPTY});
-    setP1Skipped(false);setP1Row('');
+    setP1Skipped(false);setP1Row('');setMacros(null);setMacrosLoading(false);
   };
 
   const ProgressBar=({step,total,color,label})=>(
@@ -643,7 +728,8 @@ function App(){
           ls.set('rbl_synced',updated);
           setSyncedDates(new Set(updated));
         }}
-        goToP2={!p1Skipped?()=>{setP2Step(0);setScreen('p2');}:null}/>}
+        goToP2={!p1Skipped?()=>{setP2Step(0);setScreen('p2');}:null}
+        macros={macros} macrosLoading={macrosLoading}/>}
     </div>
   </div>);
 }
