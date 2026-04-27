@@ -517,10 +517,12 @@ function App(){
   useEffect(()=>{
     const synced=ls.get('rbl_synced')||[];
     const entries=ls.get('rbl_entries')||{};
-    for(let i=1;i<=7;i++){
+    for(let i=1;i<=3;i++){
       const d=new Date();d.setDate(d.getDate()-i);d.setHours(0,0,0,0);
       if(!synced.includes(dk(d))&&entries[dk(d)]&&entries[dk(d)].wo){setP1Date(d);return;}
     }
+    // Nothing un-synced in last 3 days — default to yesterday
+    setP1Date(yday());
   },[]);
 
   useEffect(()=>{
@@ -635,10 +637,9 @@ Return ONLY valid JSON, no markdown:
   const cancelSettings=()=>setScreen(prevScreen);
 
   const bestP1Date=()=>{
-    // Walk back from yesterday to find the most recent un-synced date that has session data
     const synced=ls.get('rbl_synced')||[];
     const entries=ls.get('rbl_entries')||{};
-    for(let i=1;i<=7;i++){
+    for(let i=1;i<=3;i++){
       const d=new Date();d.setDate(d.getDate()-i);d.setHours(0,0,0,0);
       const key=dk(d);
       if(!synced.includes(key)&&entries[key]&&entries[key].wo){return d;}
