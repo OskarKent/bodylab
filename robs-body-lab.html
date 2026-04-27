@@ -554,9 +554,9 @@ function App(){
   };
 
   const finishP1=()=>{
-    // Save everything from Phase 1 into yesterday's row (the one being synced)
-    // Jump height, mood, and physical issues this morning all reflect yesterday's recovery
-    const existing=allEntries[dk(p1Date)]||{};
+    // Read fresh from localStorage to avoid stale closure
+    const freshEntries=ls.get('rbl_entries')||{};
+    const existing=freshEntries[dk(p1Date)]||{};
     const entry={...p1Data,...(!existing.wo?{wo:'OFF'}:{})};
     const merged=saveAndMerge(dk(p1Date),entry);
     setP1Entry(merged);
