@@ -368,6 +368,7 @@ function P2Notes({data,setData,isOff}){
 
 // ── Results ────────────────────────────────────────────────────────────────────
 function ResultsScreen({p1Row,p2Date,p1Skipped,onNew,scriptUrl,p1Entry,p1Date,syncStatus,macros,macrosLoading}){
+  const todayDone = syncStatus==='ok' && dk(p1Date)===dk(tday());
   const [copied,setCopied]=useState(false);
   const cp=()=>copyText(p1Row,()=>{setCopied(true);setTimeout(()=>setCopied(false),2500)});
   const card={background:'#0a0a0a',border:'1px solid #141414',borderRadius:14,padding:20,marginBottom:14};
@@ -422,7 +423,8 @@ function ResultsScreen({p1Row,p2Date,p1Skipped,onNew,scriptUrl,p1Entry,p1Date,sy
       {macros&&macros.error&&<div style={{fontSize:11,color:'#f87171'}}>{macros.error}</div>}
     </div>)}
 
-    <button onClick={onNew} style={{width:'100%',height:50,background:'#090909',border:'1px solid #121212',borderRadius:12,color:'#888',fontSize:12,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',marginTop:4}}>+ NEW ENTRY</button>
+    {!todayDone&&<button onClick={onNew} style={{width:'100%',height:50,background:'#090909',border:'1px solid #121212',borderRadius:12,color:'#888',fontSize:12,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',marginTop:4}}>+ NEW ENTRY</button>}
+    {todayDone&&<div style={{fontSize:10,color:'#2a2a2a',textAlign:'center',marginTop:12,fontFamily:'Chakra Petch',letterSpacing:'0.1em'}}>COME BACK TOMORROW</div>}
   </div>);
 }
 
@@ -486,10 +488,27 @@ function App(){
   const [p2Row,setP2Row]=useState('');
 
   useEffect(()=>{
-    setApiKey(ls.get('rbl_key')||'');
-    setScriptUrl(ls.get('rbl_script')||'');
-    setAllEntries(ls.get('rbl_entries')||{});
-    setSyncedDates(new Set(ls.get('rbl_synced')||[]));
+    const key     = ls.get('rbl_key')||'';
+    const script  = ls.get('rbl_script')||'';
+    const entries = ls.get('rbl_entries')||{};
+    const synced  = ls.get('rbl_synced')||[];
+    const savedMacros = ls.get('rbl_macros');
+    setApiKey(key);
+    setScriptUrl(script);
+    setAllEntries(entries);
+    setSyncedDates(new Set(synced));
+
+    // If today is already synced, restore results screen with saved macros
+    const todayKey = dk(tday());
+    if(synced.includes(todayKey)){
+      const todayEntry = entries[todayKey]||{};
+      setP1Date(tday());
+      setP1Entry(todayEntry);
+      setP1Row(formatRow(todayEntry, tday()));
+      setSyncStatus('ok');
+      if(savedMacros) setMacros(savedMacros);
+      setScreen('results');
+    }
   },[]);
 
   useEffect(()=>{
@@ -619,6 +638,7 @@ Return ONLY valid JSON, no markdown:
       const text=d.content?.[0]?.text||'{}';
       const parsed=JSON.parse(text.replace(/\`\`\`[\w]*/g,'').replace(/\`\`\`/g,'').trim());
       setMacros(parsed);
+      ls.set('rbl_macros', parsed);
     }catch(e){
       setMacros({error:e.message});
     }finally{
@@ -646,7 +666,7 @@ Return ONLY valid JSON, no markdown:
     setScreen('p1');setP1Step(0);setP2Step(0);
     setP1Date(bestP1Date());setP2Date(tday());
     setP1Data({...P1_EMPTY});setP2Data({...P2_EMPTY});
-    setP1Skipped(false);setP1Row('');setMacros(null);setMacrosLoading(false);setSyncStatus('idle');
+    setP1Skipped(false);setP1Row('');setMacros(null);setMacrosLoading(false);setSyncStatus('idle');ls.set('rbl_macros',null);
   };
 
   const ProgressBar=({step,total,color,label})=>(
