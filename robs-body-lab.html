@@ -367,22 +367,9 @@ function P2Notes({data,setData,isOff}){
 }
 
 // ── Results ────────────────────────────────────────────────────────────────────
-function ResultsScreen({p1Row,p2Date,p1Skipped,onNew,scriptUrl,p1Entry,p1Date,onSynced,goToP2,macros,macrosLoading}){
-  const [syncStatus,setSyncStatus]=useState('idle');
+function ResultsScreen({p1Row,p2Date,p1Skipped,onNew,scriptUrl,p1Entry,p1Date,syncStatus,macros,macrosLoading}){
   const [copied,setCopied]=useState(false);
   const cp=()=>copyText(p1Row,()=>{setCopied(true);setTimeout(()=>setCopied(false),2500)});
-
-  const sync=async()=>{
-    if(!scriptUrl)return;
-    setSyncStatus('loading');
-    try{
-      const payload=encodeURIComponent(JSON.stringify({values:rowValues(p1Entry,p1Date)}));
-      await fetch(scriptUrl+'?data='+payload,{mode:'no-cors'});
-      setSyncStatus('ok');
-      if(onSynced)onSynced();
-    }catch(e){setSyncStatus('err');}
-  };
-
   const card={background:'#0a0a0a',border:'1px solid #141414',borderRadius:14,padding:20,marginBottom:14};
   const tag={fontSize:9,fontFamily:'Chakra Petch,monospace',letterSpacing:'0.16em',marginBottom:10};
 
@@ -390,28 +377,22 @@ function ResultsScreen({p1Row,p2Date,p1Skipped,onNew,scriptUrl,p1Entry,p1Date,on
     <div style={{fontSize:22,fontFamily:'Chakra Petch',color:'#ff6b2b',letterSpacing:'0.06em',marginBottom:2}}>ALL DONE ✓</div>
     <div style={{fontSize:10,color:'#666',fontFamily:'Chakra Petch',letterSpacing:'0.12em',marginBottom:28}}>{new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase()}</div>
 
-    {/* Completed row — only shown after Phase 1 close-out */}
-    {!p1Skipped&&p1Row&&(<div style={card}>
-      <div style={{...tag,color:'#4ade80'}}>COMPLETE ROW — {fmtDate(p1Date).toUpperCase()}</div>
-      <div style={{fontSize:11,color:'#999',marginBottom:14}}>Session + sleep + nutrition — ready to log</div>
-      <div style={{display:'flex',gap:8}}>
-        {scriptUrl&&(<button onClick={sync} style={{flex:1,height:44,borderRadius:8,cursor:'pointer',transition:'all 0.2s',
-          background:syncStatus==='ok'?'#14532d':syncStatus==='loading'?'#0a1a0a':'#0d0d0d',
-          border:`1px solid ${syncStatus==='ok'?'#166534':'#1e1e1e'}`,
-          color:syncStatus==='ok'?'#4ade80':syncStatus==='loading'?'#555':'#aaa',
-          fontSize:12,fontFamily:'Chakra Petch',letterSpacing:'0.08em',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
-          {syncStatus==='loading'&&<div style={{width:10,height:10,border:'2px solid #4ade80',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>}
-          {syncStatus==='ok'?'✓ SENT — CHECK SHEET':syncStatus==='loading'?'SENDING...':'↑ SYNC TO SHEET'}
-        </button>)}
-        <button onClick={cp} style={{flex:scriptUrl?0:1,height:44,padding:scriptUrl?'0 14px':'0',minWidth:scriptUrl?80:0,
-          borderRadius:8,cursor:'pointer',transition:'all 0.2s',
-          background:copied?'#14532d':'#0d0d0d',border:`1px solid ${copied?'#166534':'#1e1e1e'}`,
-          color:copied?'#4ade80':'#555',fontSize:11,fontFamily:'Chakra Petch',letterSpacing:'0.06em',whiteSpace:'nowrap'}}>
-          {copied?'✓':'COPY CSV'}
-        </button>
+    <div style={card}>
+      <div style={{...tag,color:syncStatus==='ok'?'#4ade80':syncStatus==='err'?'#f87171':'#ff6b2b'}}>
+        {syncStatus==='ok'?'✓ LOGGED — '+fmtDate(p1Date).toUpperCase():syncStatus==='loading'?'SYNCING...':syncStatus==='err'?'SYNC FAILED':'SESSION SAVED'}
       </div>
-      {syncStatus==='ok'&&<div style={{fontSize:10,color:'#777',marginTop:8}}>Check the last row of your sheet to confirm</div>}
-    </div>)}
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:p1Row?12:0}}>
+        {syncStatus==='loading'&&<div style={{width:10,height:10,border:'2px solid #ff6b2b',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.7s linear infinite',flexShrink:0}}/>}
+        <div style={{fontSize:11,color:'#777'}}>
+          {syncStatus==='ok'?'Row written to your sheet.':syncStatus==='err'?'Sheet write failed — use CSV fallback.':syncStatus==='loading'?'Writing to sheet...':'Saved locally.'}
+        </div>
+      </div>
+      {p1Row&&(<button onClick={cp} style={{height:36,padding:'0 14px',borderRadius:8,cursor:'pointer',transition:'all 0.2s',
+        background:copied?'#14532d':'#0d0d0d',border:`1px solid ${copied?'#166534':'#1e1e1e'}`,
+        color:copied?'#4ade80':'#555',fontSize:11,fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>
+        {copied?'✓ COPIED':'COPY CSV FALLBACK'}
+      </button>)}
+    </div>
 
     {/* Today's session — saved locally, syncs tomorrow after close-out */}
     <div style={card}>
@@ -441,11 +422,7 @@ function ResultsScreen({p1Row,p2Date,p1Skipped,onNew,scriptUrl,p1Entry,p1Date,on
       {macros&&macros.error&&<div style={{fontSize:11,color:'#f87171'}}>{macros.error}</div>}
     </div>)}
 
-    {!scriptUrl&&!p1Skipped&&p1Row&&<div style={{fontSize:11,color:'#444',textAlign:'center',marginTop:-6,marginBottom:14,fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>Add Script URL in ⚙ to enable direct sync</div>}
-
-    {goToP2&&<button onClick={goToP2} style={{width:'100%',height:52,background:'#ff6b2b',border:'none',borderRadius:12,color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.06em',marginTop:4}}>LOG SESSION →</button>}
-
-    <button onClick={onNew} style={{width:'100%',height:50,background:'#090909',border:'1px solid #121212',borderRadius:12,color:'#888',fontSize:12,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',marginTop:10}}>+ NEW ENTRY</button>
+    <button onClick={onNew} style={{width:'100%',height:50,background:'#090909',border:'1px solid #121212',borderRadius:12,color:'#888',fontSize:12,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',marginTop:4}}>+ NEW ENTRY</button>
   </div>);
 }
 
@@ -505,6 +482,7 @@ function App(){
   const [p1Row,setP1Row]=useState('');
   const [macros,setMacros]=useState(null);
   const [macrosLoading,setMacrosLoading]=useState(false);
+  const [syncStatus,setSyncStatus]=useState('idle');
   const [p2Row,setP2Row]=useState('');
 
   useEffect(()=>{
@@ -554,23 +532,41 @@ function App(){
   };
 
   const finishP1=()=>{
-    // Read fresh from localStorage to avoid stale closure
-    const freshEntries=ls.get('rbl_entries')||{};
-    const existing=freshEntries[dk(p1Date)]||{};
-    const entry={...p1Data,...(!existing.wo?{wo:'OFF'}:{})};
-    const merged=saveAndMerge(dk(p1Date),entry);
+    // Save morning data locally — sheet write happens after session
+    const merged=saveAndMerge(dk(p1Date),p1Data);
     setP1Entry(merged);
-    setP1Row(formatRow(merged,p1Date));
-    setScreen('results');
+    setScreen('p2');
   };
   const skipP1=()=>{setP1Skipped(true);setScreen('p2');};
 
   const finishP2=async()=>{
-    saveAndMerge(dk(p2Date),p2Data);
+    // Merge session data into today's entry (which already has morning data)
+    const freshEntries=ls.get('rbl_entries')||{};
+    const morningData=freshEntries[dk(p1Date)]||{};
+    const sessionEntry={...p2Data,...(!p2Data.wo?{wo:'OFF'}:{})};
+    // Full row = morning data (from p1Date) + session data (for p2Date)
+    // Since morning and session are same day, merge into p1Date entry
+    const merged=saveAndMerge(dk(p1Date),sessionEntry);
+    setP2Entry(merged);
+    setP1Entry(merged);
+    setP1Row(formatRow(merged,p1Date));
     setScreen('results');
-    if(apiKey&&scriptUrl){
+    // Sync and get macros
+    if(scriptUrl){
+      setSyncStatus('loading');
+      try{
+        const payload=encodeURIComponent(JSON.stringify({values:rowValues(merged,p1Date)}));
+        await fetch(scriptUrl+'?data='+payload,{mode:'no-cors'});
+        setSyncStatus('ok');
+        const existing=ls.get('rbl_synced')||[];
+        const updated=[...new Set([...existing,dk(p1Date)])];
+        ls.set('rbl_synced',updated);
+        setSyncedDates(new Set(updated));
+      }catch(e){setSyncStatus('err');}
+    }
+    if(apiKey){
       setMacrosLoading(true);
-      fetchMacros(p2Data,p1Entry);
+      fetchMacros(merged,morningData);
     }
   };
 
@@ -650,7 +646,7 @@ Return ONLY valid JSON, no markdown:
     setScreen('p1');setP1Step(0);setP2Step(0);
     setP1Date(bestP1Date());setP2Date(tday());
     setP1Data({...P1_EMPTY});setP2Data({...P2_EMPTY});
-    setP1Skipped(false);setP1Row('');setMacros(null);setMacrosLoading(false);
+    setP1Skipped(false);setP1Row('');setMacros(null);setMacrosLoading(false);setSyncStatus('idle');
   };
 
   const ProgressBar=({step,total,color,label})=>(
@@ -688,7 +684,7 @@ Return ONLY valid JSON, no markdown:
         {screen==='p2'&&<div style={{fontSize:8,color:'#777',fontFamily:'Chakra Petch',letterSpacing:'0.12em',marginTop:2}}>SESSION</div>}
       </div>
       <div style={{display:'flex',gap:14,alignItems:'center'}}>
-        {screen==='p1'&&<button onClick={skipP1} style={{background:'none',border:'1px solid #333',borderRadius:6,color:'#999',fontSize:10,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',padding:'6px 10px',lineHeight:1}}>SKIP MORNING →</button>}
+        {screen==='p1'&&<button onClick={skipP1} style={{background:'none',border:'1px solid #333',borderRadius:6,color:'#999',fontSize:10,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.08em',padding:'6px 10px',lineHeight:1}}>SKIP →</button>}
         {(screen==='results'||screen==='p2')&&<button onClick={reset} style={{background:'none',border:'none',color:'#888',fontSize:11,cursor:'pointer',fontFamily:'Chakra Petch',letterSpacing:'0.1em',padding:0}}>+ NEW</button>}
         <button onClick={screen==='settings'?cancelSettings:openSettings}
           style={{background:'none',border:'none',color:screen==='settings'?'#ff6b2b':'#777',fontSize:19,cursor:'pointer',lineHeight:1,padding:0}}>⚙</button>
@@ -707,7 +703,7 @@ Return ONLY valid JSON, no markdown:
         {p1Step===1&&<P1Morning data={p1Data} setData={setP1Data}/>}
         {p1Step===2&&<P1Weight data={p1Data} setData={setP1Data}/>}
         {p1Step===3&&<P1Nutrition data={p1Data} setData={setP1Data} apiKey={apiKey}/>}
-        <NavRow step={p1Step} setStep={setP1Step} isLast={p1IsLast} canNext={true} onFinish={finishP1} finishLabel="SYNC & CONTINUE →" accent="#666"/>
+        <NavRow step={p1Step} setStep={setP1Step} isLast={p1IsLast} canNext={true} onFinish={finishP1} finishLabel="DONE → LOG SESSION" accent="#666"/>
       </div>)}
 
       {screen==='p2'&&(<div>
@@ -723,14 +719,7 @@ Return ONLY valid JSON, no markdown:
 
       {screen==='results'&&<ResultsScreen p1Row={p1Row} p1Date={p1Date} p2Date={p2Date}
         p1Skipped={p1Skipped} onNew={reset} scriptUrl={scriptUrl} p1Entry={p1Entry}
-        onSynced={()=>{
-          const existing=ls.get('rbl_synced')||[];
-          const updated=[...new Set([...existing,dk(p1Date)])];
-          ls.set('rbl_synced',updated);
-          setSyncedDates(new Set(updated));
-        }}
-        goToP2={!p1Skipped?()=>{setP2Step(0);setScreen('p2');}:null}
-        macros={macros} macrosLoading={macrosLoading}/>}
+        syncStatus={syncStatus} macros={macros} macrosLoading={macrosLoading}/>}
     </div>
   </div>);
 }
