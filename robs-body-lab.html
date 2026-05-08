@@ -240,11 +240,54 @@ function DatePicker({date,onChange,label}){
   </div>);
 }
 
+
+const SCAN_ALL_PROMPT = `You will receive between 3 and 5 screenshots from different apps. Identify each one and extract all relevant values.
+
+Screenshot types:
+- Oura Sleep screen: shows a large sleep score and total sleep time (e.g. "7h 42min")
+- Oura Readiness screen: shows Key Metrics including Resting Heart Rate bpm and HRV ms
+- Nutrition app (Cronometer/MyFitnessPal etc): shows daily totals for calories, protein, carbohydrates
+- Coros activity summary: shows total distance km, total time, Training Load, avg pace and HR for the whole session
+- Coros lap breakdown: shows interval laps with a TOTAL row at the bottom — use TOTAL row for avg pace and avg HR
+
+Extract:
+sleepScore (Oura Sleep score), sleepHours (total sleep as decimal, "7h 42min"=7.7),
+rhr (Resting Heart Rate bpm from Oura Readiness), hrv (HRV ms from Oura Readiness),
+cals (total calories), protein (grams), carbs (carbohydrate grams),
+totalKM (Coros distance, null if no Coros), totalTime (H:MM:SS, null if no Coros),
+corosLoad (Training Load, null if no Coros),
+avgPace (M:SS from TOTAL lap row if available else Coros summary, null if no Coros),
+avgHR (from TOTAL lap row if available else Coros summary, null if no Coros)
+
+Return ONLY valid JSON, no markdown:
+{"sleepScore":93,"sleepHours":7.7,"rhr":44,"hrv":49,"cals":3476,"protein":204,"carbs":549,"totalKM":10.77,"totalTime":"0:50:56","corosLoad":204,"avgPace":"4:13","avgHR":170}`;
+
+const SCAN_ALL_LABELS=[
+  {key:'sleepScore',label:'Sleep Score'},{key:'sleepHours',label:'Sleep',unit:'h'},
+  {key:'rhr',label:'RHR',unit:' bpm'},{key:'hrv',label:'HRV',unit:' ms'},
+  {key:'cals',label:'Calories'},{key:'protein',label:'Protein',unit:'g'},{key:'carbs',label:'Carbs',unit:'g'},
+  {key:'totalKM',label:'Distance',unit:'km'},{key:'totalTime',label:'Time'},{key:'corosLoad',label:'Load'},
+  {key:'avgPace',label:'Pace',unit:'/km'},{key:'avgHR',label:'HR',unit:' bpm'},
+];
 // ── Phase 1 steps ──────────────────────────────────────────────────────────────
-function P1Sleep({data,setData,apiKey}){
+function P1Sleep({data,setData,apiKey,setSessionData}){
   const upd=(vals)=>setData(p=>({...p,...vals}));
+  const updAll=(vals)=>{
+    const {totalKM,totalTime,corosLoad,avgPace,avgHR,...p1vals}=vals;
+    setData(p=>({...p,...p1vals}));
+    const cv={};
+    if(totalKM!=null)cv.totalKM=String(totalKM);
+    if(totalTime!=null)cv.totalTime=String(totalTime);
+    if(corosLoad!=null)cv.corosLoad=String(corosLoad);
+    if(avgPace!=null)cv.avgPace=String(avgPace);
+    if(avgHR!=null)cv.avgHR=String(avgHR);
+    if(Object.keys(cv).length&&setSessionData)setSessionData(p=>({...p,...cv}));
+  };
   return(<div>
-    <ScanButton label="SCAN OURA" hint="Select Sleep screenshot + Readiness screenshot together" multiple
+    <ScanButton label="SCAN ALL SCREENSHOTS" hint="Select all at once: Oura Sleep, Oura Readiness, nutrition app + Coros if you trained (skip Coros on off days)" multiple
+      prompt={SCAN_ALL_PROMPT} previewLabels={SCAN_ALL_LABELS} onApply={updAll} apiKey={apiKey}/>
+    <Divider/>
+    <ScanButton label="SCAN OURA ONLY" hint="Select Sleep + Readiness screenshots" multiple
       prompt={OURA_PROMPT} previewLabels={OURA_LABELS} onApply={upd} apiKey={apiKey}/>
     <Divider/>
     <F label="Sleep Score"><Num value={data.sleepScore} onChange={v=>upd({sleepScore:v})} min={0} max={100}/></F>
@@ -719,7 +762,7 @@ Return ONLY valid JSON, no markdown:
         <DatePicker date={p1Date} onChange={setP1Date} label="MORNING OF"/>
         {syncedDates.has(dk(p1Date))&&<div style={{background:'#091209',border:'1px solid #163016',borderRadius:8,padding:'10px 14px',marginTop:-16,marginBottom:20,fontSize:11,color:'#4ade80',fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>✓ Already synced — pick a different date or skip</div>}
         <ProgressBar step={p1Step} total={P1_STEPS.length} color="#666" label={P1_STEPS[p1Step].toUpperCase()}/>
-        {p1Step===0&&<P1Sleep data={p1Data} setData={setP1Data} apiKey={apiKey}/>}
+        {p1Step===0&&<P1Sleep data={p1Data} setData={setP1Data} apiKey={apiKey} setSessionData={setP2Data}/>}
         {p1Step===1&&<P1Morning data={p1Data} setData={setP1Data}/>}
         {p1Step===2&&<P1Weight data={p1Data} setData={setP1Data}/>}
         {p1Step===3&&<P1Nutrition data={p1Data} setData={setP1Data} apiKey={apiKey}/>}
