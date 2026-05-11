@@ -606,19 +606,19 @@ function App(){
     const freshEntries=ls.get('rbl_entries')||{};
     const morningData=freshEntries[dk(p1Date)]||{};
     const sessionEntry={...p2Data,...(!p2Data.wo?{wo:'OFF'}:{})};
-    // Full row = morning data (from p1Date) + session data (for p2Date)
-    // Since morning and session are same day, merge into p1Date entry
     const merged=saveAndMerge(dk(p1Date),sessionEntry);
     setP2Entry(merged);
     setP1Entry(merged);
     setP1Row(formatRow(merged,p1Date));
     setScreen('results');
-    // Sync and get macros
-    if(scriptUrl){
+    // Read fresh from localStorage to avoid stale closure
+    const freshScript=ls.get('rbl_script')||'';
+    const freshKey=ls.get('rbl_key')||'';
+    if(freshScript){
       setSyncStatus('loading');
       try{
         const payload=encodeURIComponent(JSON.stringify({values:rowValues(merged,p1Date)}));
-        await fetch(scriptUrl+'?data='+payload,{mode:'no-cors'});
+        await fetch(freshScript+'?data='+payload,{mode:'no-cors'});
         setSyncStatus('ok');
         const existing=ls.get('rbl_synced')||[];
         const updated=[...new Set([...existing,dk(p1Date)])];
@@ -626,19 +626,20 @@ function App(){
         setSyncedDates(new Set(updated));
       }catch(e){setSyncStatus('err');}
     }
-    if(apiKey){
+    if(freshKey){
       setMacrosLoading(true);
-      fetchMacros(merged,morningData);
+      fetchMacros(merged,morningData,freshScript,freshKey);
     }
   };
 
-  const fetchMacros=async(sessionData,morningData)=>{
+  const fetchMacros=async(sessionData,morningData,freshScript,freshKey)=>{
+    const useScript=freshScript||ls.get('rbl_script')||'';
+    const useKey=freshKey||ls.get('rbl_key')||'';
     try{
-      // Fetch last 30 rows from sheet
       let sheetRows=[];
-      if(scriptUrl){
+      if(useScript){
         try{
-          const res=await jsonpFetch(scriptUrl+'?action=read&n=30');
+          const res=await jsonpFetch(useScript+'?action=read&n=30');
           if(res.ok&&res.rows)sheetRows=res.rows;
         }catch(e){console.log('Sheet read failed',e);}
       }
@@ -658,7 +659,7 @@ function App(){
 
       const res=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
-        headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        headers:{'Content-Type':'application/json','x-api-key':useKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
         body:JSON.stringify({
           model:'claude-sonnet-4-6',
           max_tokens:600,
