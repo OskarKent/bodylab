@@ -412,6 +412,7 @@ function P2Notes({data,setData,isOff}){
 // ── Results ────────────────────────────────────────────────────────────────────
 function ResultsScreen({p1Row,p2Date,p1Skipped,onNew,scriptUrl,p1Entry,p1Date,syncStatus,macros,macrosLoading}){
   const todayDone = syncStatus==='ok' && dk(p1Date)===dk(tday());
+  const [syncRetrying,setSyncRetrying]=useState(false);
   const [copied,setCopied]=useState(false);
   const cp=()=>copyText(p1Row,()=>{setCopied(true);setTimeout(()=>setCopied(false),2500)});
   const card={background:'#0a0a0a',border:'1px solid #141414',borderRadius:14,padding:20,marginBottom:14};
@@ -422,20 +423,28 @@ function ResultsScreen({p1Row,p2Date,p1Skipped,onNew,scriptUrl,p1Entry,p1Date,sy
     <div style={{fontSize:10,color:'#666',fontFamily:'Chakra Petch',letterSpacing:'0.12em',marginBottom:28}}>{new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase()}</div>
 
     <div style={card}>
-      <div style={{...tag,color:syncStatus==='ok'?'#4ade80':syncStatus==='err'?'#f87171':'#ff6b2b'}}>
-        {syncStatus==='ok'?'✓ LOGGED — '+fmtDate(p1Date).toUpperCase():syncStatus==='loading'?'SYNCING...':syncStatus==='err'?'SYNC FAILED':'SESSION SAVED'}
-      </div>
-      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:p1Row?12:0}}>
+      <div style={{...tag,color:syncStatus==='ok'?'#4ade80':syncStatus==='err'?'#f87171':'#ff6b2b'}}>{syncStatus==='ok'?'✓ LOGGED — '+fmtDate(p1Date).toUpperCase():syncStatus==='loading'?'SYNCING...':syncStatus==='err'?'SYNC FAILED':'SESSION SAVED'}</div>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
         {syncStatus==='loading'&&<div style={{width:10,height:10,border:'2px solid #ff6b2b',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.7s linear infinite',flexShrink:0}}/>}
-        <div style={{fontSize:11,color:'#777'}}>
-          {syncStatus==='ok'?'Row written to your sheet.':syncStatus==='err'?'Sheet write failed — use CSV fallback.':syncStatus==='loading'?'Writing to sheet...':'Saved locally.'}
-        </div>
+        <div style={{fontSize:11,color:'#777'}}>{syncStatus==='ok'?'Row written to your sheet.':syncStatus==='err'?'Sheet write failed — use CSV fallback.':syncStatus==='loading'?'Writing to sheet...':'Saved locally.'}</div>
       </div>
-      {p1Row&&(<button onClick={cp} style={{height:36,padding:'0 14px',borderRadius:8,cursor:'pointer',transition:'all 0.2s',
-        background:copied?'#14532d':'#0d0d0d',border:`1px solid ${copied?'#166534':'#1e1e1e'}`,
-        color:copied?'#4ade80':'#555',fontSize:11,fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>
-        {copied?'✓ COPIED':'COPY CSV FALLBACK'}
+      <div style={{fontSize:9,color:'#333',fontFamily:'monospace',marginBottom:8}}>
+        {`Script: ${(ls.get('rbl_script')||'').slice(0,40)||'NOT SET'} | Date: ${dk(p1Date)} | Status: ${syncStatus}`}
+      </div>
+      {(syncStatus==='idle'||syncStatus==='err')&&p1Row&&(<button onClick={async()=>{
+        const sc=ls.get('rbl_script')||'';
+        if(!sc){alert('No script URL found in settings');return;}
+        setSyncRetrying(true);
+        try{
+          const payload=encodeURIComponent(JSON.stringify({values:rowValues(p1Entry,p1Date)}));
+          await fetch(sc+'?data='+payload,{mode:'no-cors'});
+          alert('Retry sent — check sheet');
+        }catch(e){alert('Retry failed: '+e.message);}
+        setSyncRetrying(false);
+      }} style={{height:36,padding:'0 14px',borderRadius:8,cursor:'pointer',background:'#0d0d0d',border:'1px solid #1e1e1e',color:'#aaa',fontSize:11,fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>
+        RETRY SYNC
       </button>)}
+      {p1Row&&(<button onClick={cp} style={{marginTop:8,height:36,padding:'0 14px',borderRadius:8,cursor:'pointer',transition:'all 0.2s',background:copied?'#14532d':'#0d0d0d',border:`1px solid ${copied?'#166534':'#1e1e1e'}`,color:copied?'#4ade80':'#555',fontSize:11,fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>{copied?'✓ COPIED':'COPY CSV FALLBACK'}</button>)}
     </div>
 
     {/* Today's session — saved locally, syncs tomorrow after close-out */}
