@@ -512,7 +512,7 @@ function App(){
   const [screen,setScreen]=useState('p1');
   const [prevScreen,setPrevScreen]=useState('p1');
   const [p1Step,setP1Step]=useState(0);
-  const [p1Date,setP1Date]=useState(yday()); // updated after mount
+  const [p1Date,setP1Date]=useState(tday());
   const [p1Data,setP1Data]=useState({...P1_EMPTY});
   const [p1Skipped,setP1Skipped]=useState(false);
   const [p2Step,setP2Step]=useState(0);
@@ -554,16 +554,7 @@ function App(){
     }
   },[]);
 
-  useEffect(()=>{
-    const synced=ls.get('rbl_synced')||[];
-    const entries=ls.get('rbl_entries')||{};
-    for(let i=1;i<=3;i++){
-      const d=new Date();d.setDate(d.getDate()-i);d.setHours(0,0,0,0);
-      if(!synced.includes(dk(d))&&entries[dk(d)]&&entries[dk(d)].wo){setP1Date(d);return;}
-    }
-    // Nothing un-synced in last 3 days — default to yesterday
-    setP1Date(yday());
-  },[]);
+
 
   useEffect(()=>{
     const e=allEntries[dk(p1Date)]||{};
@@ -696,19 +687,10 @@ Return ONLY valid JSON, no markdown:
   const saveSettings=()=>{ls.set('rbl_key',apiKey);ls.set('rbl_script',scriptUrl);setScreen(prevScreen);};
   const cancelSettings=()=>setScreen(prevScreen);
 
-  const bestP1Date=()=>{
-    const synced=ls.get('rbl_synced')||[];
-    const entries=ls.get('rbl_entries')||{};
-    for(let i=1;i<=3;i++){
-      const d=new Date();d.setDate(d.getDate()-i);d.setHours(0,0,0,0);
-      const key=dk(d);
-      if(!synced.includes(key)&&entries[key]&&entries[key].wo){return d;}
-    }
-    return yday();
-  };
+
   const reset=()=>{
     setScreen('p1');setP1Step(0);setP2Step(0);
-    setP1Date(bestP1Date());setP2Date(tday());
+    setP1Date(tday());setP2Date(tday());
     setP1Data({...P1_EMPTY});setP2Data({...P2_EMPTY});
     setP1Skipped(false);setP1Row('');setMacros(null);setMacrosLoading(false);setSyncStatus('idle');ls.set('rbl_macros',null);
   };
@@ -760,7 +742,7 @@ Return ONLY valid JSON, no markdown:
       {screen==='settings'&&<SettingsScreen apiKey={apiKey} setApiKey={setApiKey} scriptUrl={scriptUrl} setScriptUrl={setScriptUrl} onSave={saveSettings} onCancel={cancelSettings}/>}
 
       {screen==='p1'&&(<div>
-        <DatePicker date={p1Date} onChange={setP1Date} label="MORNING OF"/>
+        <DatePicker date={p1Date} onChange={setP1Date} label="TODAY"/>
         {syncedDates.has(dk(p1Date))&&<div style={{background:'#091209',border:'1px solid #163016',borderRadius:8,padding:'10px 14px',marginTop:-16,marginBottom:20,fontSize:11,color:'#4ade80',fontFamily:'Chakra Petch',letterSpacing:'0.06em'}}>✓ Already synced — pick a different date or skip</div>}
         <ProgressBar step={p1Step} total={P1_STEPS.length} color="#666" label={P1_STEPS[p1Step].toUpperCase()}/>
         {p1Step===0&&<P1Sleep data={p1Data} setData={setP1Data} apiKey={apiKey} setSessionData={setP2Data}/>}
